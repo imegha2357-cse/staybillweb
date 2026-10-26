@@ -74,6 +74,7 @@ Other functions in the same deploy:
 | `icalImport` | Every 30 minutes, reads the travel sites' calendars and adds their bookings (and cancellations) to Bookings |
 | `dailyAutomations` | 9 am India time: pre-arrival, post-stay, birthday, anniversary and win-back emails that the owner switched on, and pausing hotels whose subscription is overdue past the grace period |
 | `unsubscribe` | The link at the bottom of marketing emails |
+| `sendWhatsApp` | Sends WhatsApp messages through the WhatsApp Business Cloud API when the hotel chose automatic sending (Settings → WhatsApp). Needs `firebase functions:secrets:set WHATSAPP_TOKEN` (a permanent Meta system-user token) and one approved Utility template per message, each with a single body variable |
 
 Scheduled functions need Cloud Scheduler, which the first deploy switches on for you (Blaze plan).
 
@@ -159,7 +160,7 @@ These are built and ready, but need an account only you can open:
 
 - **Razorpay checkout** for subscriptions: put a Razorpay payment link on each plan now (owners see a Pay button); automatic card/UPI checkout needs a small server step with your Razorpay secret.
 - **Live OTA channel manager APIs** (instant rate and inventory push): StayBill syncs through iCal calendars, which every major travel site supports; two-way rate push needs a channel-manager partner account.
-- **WhatsApp Business API** for bulk sending: StayBill opens ready-filled WhatsApp messages one by one and exports a CSV for any bulk tool.
+- **WhatsApp:** guests get bill details, payment reminders, receipts, booking confirmations and the feedback link on WhatsApp. In the free mode StayBill opens WhatsApp with the message typed in; in the Business API mode (Settings → WhatsApp) they go out automatically through the `sendWhatsApp` function once you add your Meta account details.
 - **E-invoice IRN**: StayBill produces the NIC JSON; upload it on the IRP or through your GST Suvidha Provider to get the IRN and QR code.
 
 ## 1. Create the Firebase project (one time)

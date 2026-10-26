@@ -240,7 +240,28 @@ function parseIcs(text) {
   return out;
 }
 
+// ---------- WhatsApp Business Cloud API ----------
+/**
+ * Request body for one WhatsApp message. With an approved template (needed to start a
+ * conversation) the whole message goes in as the template's single body variable;
+ * without one it is sent as plain text, which WhatsApp only delivers within 24 hours
+ * of the guest's last message.
+ */
+function whatsappPayload(msg, waSettings = {}) {
+  const to = String(msg.to || '').replace(/\D/g, '');
+  if (to.length < 11 || to.length > 15) return { error: 'invalid number' };
+  if (!String(msg.body || '').trim()) return { error: 'empty message' };
+  const tpl = waSettings.api?.templates?.[msg.kind];
+  if (tpl?.name) {
+    // Template variables cannot contain new lines, tabs or more than 4 spaces in a row.
+    const text = String(msg.body).replace(/\s*\n+\s*/g, ' · ').replace(/\t/g, ' ').replace(/ {4,}/g, '   ').slice(0, 1024);
+    return { body: { messaging_product: 'whatsapp', to, type: 'template', template: { name: tpl.name, language: { code: tpl.lang || 'en' }, components: [{ type: 'body', parameters: [{ type: 'text', text }] }] } } };
+  }
+  return { body: { messaging_product: 'whatsapp', to, type: 'text', text: { preview_url: true, body: String(msg.body).slice(0, 4096) } } };
+}
+
 module.exports = {
+  whatsappPayload,
   decide, buildEmail, buildReservationEmail, buildThankYouEmail, buildMessageEmail, textToHtml, fill, dueAutomations, buildIcs, parseIcs, unsubToken,
   money, day, EMAIL_RE, KINDS, BILL_KINDS, DIRECT_KINDS,
 };

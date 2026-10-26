@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { LoginFields, ResetPasswordModal, genPassword } from './AdminHome';
 import MailStatus from '../components/MailStatus';
 import SubscriptionCard from './SubscriptionCard';
+import WhatsAppSettings from './WhatsAppSettings';
 import { GROUPS, MODULES } from '../modules/registry';
 import { Plus, Pencil, Trash2, Upload, Download, KeyRound } from '../components/icons';
 import { useAuth } from '../context/AuthContext';
@@ -22,7 +23,7 @@ import { Badge, Button, IconButton, Card, Field, Input, Loading, Modal, PageHead
 
 const TABS = [
   { id: 'hotel', label: 'Hotel' }, { id: 'invoice', label: 'Invoice' }, { id: 'taxes', label: 'Taxes' },
-  { id: 'modules', label: 'Modules' }, { id: 'users', label: 'Staff logins' }, { id: 'permissions', label: 'Permissions' }, { id: 'email', label: 'Guest emails' }, { id: 'audit', label: 'Audit Log' }, { id: 'backup', label: 'Backup' }, { id: 'plan', label: 'Subscription' },
+  { id: 'modules', label: 'Modules' }, { id: 'users', label: 'Staff logins' }, { id: 'permissions', label: 'Permissions' }, { id: 'email', label: 'Guest emails' }, { id: 'whatsapp', label: 'WhatsApp' }, { id: 'audit', label: 'Audit Log' }, { id: 'backup', label: 'Backup' }, { id: 'plan', label: 'Subscription' },
 ];
 
 export default function Settings() {
@@ -37,6 +38,7 @@ export default function Settings() {
       {tab === 'modules' && <ModuleSettings />}
       {tab === 'users' && <StaffManagement />}
       {tab === 'email' && <EmailSettings />}
+      {tab === 'whatsapp' && <WhatsAppSettings />}
       {tab === 'permissions' && <Permissions />}
       {tab === 'audit' && <AuditLog />}
       {tab === 'backup' && <Backup />}

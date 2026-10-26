@@ -63,6 +63,11 @@ export async function checkOutBill(user, bill, { rooms = [], settings = {} } = {
   }).catch(() => {});
   if (bill.bookingId) await updateDoc(hdoc('bookings', bill.bookingId), { status: 'Checked out', updatedAt: serverTimestamp() }).catch(() => {});
   await addDoc(hcol('auditLogs'), auditPayload(user, 'GUEST_CHECKED_OUT', 'bills', bill.id, { invoiceNumber: bill.invoiceNumber, roomNumber: bill.roomNumber })).catch(() => {});
+  {
+    const wa = await import('../lib/whatsapp');
+    const { feedbackUrl: fb } = await import('./guests/publicLinks');
+    await wa.autoWhatsApp(user, settings, { kind: 'thankyou', phone: bill.guest?.phone, vars: wa.billVars(bill, settings, { feedback: fb(getHotelId(), { ...bill, feedbackToken }) }), billId: bill.id, guestName: bill.guestName });
+  }
   if (thank) {
     const { feedbackUrl } = await import('./guests/publicLinks');
     await queueGuestEmail(user, bill, 'thankyou', { extra: { feedbackUrl: feedbackUrl(getHotelId(), { ...bill, feedbackToken }) } }).catch(() => {});

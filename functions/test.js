@@ -81,3 +81,16 @@ test('iCal round trip and unsubscribe tokens', () => {
   assert.strictEqual(unsubToken('s', 'h1', 'g1'), unsubToken('s', 'h1', 'g1'));
   assert.notStrictEqual(unsubToken('s', 'h1', 'g1'), unsubToken('s', 'h1', 'g2'));
 });
+
+const { whatsappPayload } = require('./lib');
+test('WhatsApp messages: template, plain text and bad numbers', () => {
+  const msg = { to: '919840022222', kind: 'paid', body: 'Thank you Asha!\nWe received ₹6,300.' };
+  const t = whatsappPayload(msg, { api: { templates: { paid: { name: 'staybill_paid', lang: 'en' } } } }).body;
+  assert.strictEqual(t.type, 'template');
+  assert.strictEqual(t.template.name, 'staybill_paid');
+  assert.strictEqual(t.template.components[0].parameters[0].text, 'Thank you Asha! · We received ₹6,300.');
+  const p = whatsappPayload(msg, {}).body;
+  assert.strictEqual(p.type, 'text'); assert.match(p.text.body, /\n/);
+  assert.strictEqual(whatsappPayload({ ...msg, to: '98400' }, {}).error, 'invalid number');
+  assert.strictEqual(whatsappPayload({ ...msg, body: ' ' }, {}).error, 'empty message');
+});

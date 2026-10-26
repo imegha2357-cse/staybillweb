@@ -303,6 +303,17 @@ service cloud.firestore {
       match /expenses/{id} { allow read, write: if canMod(h, 'expenses', false); }
       match /creditNotes/{id} { allow read, create, update: if canMod(h, 'creditnotes', false); allow delete: if false; }
 
+      // WhatsApp messages: staff log the ones they open in WhatsApp, or queue them for the
+      // sendWhatsApp function (Business API); only the function records the result.
+      match /whatsapp/{id} {
+        allow read: if inHotel(h);
+        allow create: if inHotel(h) && request.resource.data.status in ['opened', 'queued']
+          && request.resource.data.kind in ['booking', 'paid', 'reminder', 'reservation', 'thankyou']
+          && request.resource.data.requestedBy.uid == request.auth.uid
+          && request.resource.data.body is string && request.resource.data.body.size() < 4096;
+        allow update, delete: if false;
+      }
+
       // Audit log (append-only)
       match /auditLogs/{id} {
         allow read: if inHotel(h);

@@ -10,6 +10,8 @@
 //  - dailyAutomations: pre-arrival, post-stay, birthday, anniversary and
 //    win-back emails, and pausing hotels whose subscription is overdue.
 //  - unsubscribe: the link at the bottom of campaign emails.
+//  - sendWhatsApp: sends WhatsApp messages queued at hotels/{hotelId}/whatsapp through
+//    the WhatsApp Business Cloud API (when the hotel chose automatic sending).
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
@@ -19,7 +21,7 @@ const admin = require('firebase-admin');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const {
-  decide, buildEmail, buildReservationEmail, buildThankYouEmail, buildMessageEmail, dueAutomations, buildIcs, parseIcs, unsubToken, BILL_KINDS,
+  whatsappPayload, decide, buildEmail, buildReservationEmail, buildThankYouEmail, buildMessageEmail, dueAutomations, buildIcs, parseIcs, unsubToken, BILL_KINDS,
 } = require('./lib');
 const { invoicePdf } = require('./pdf');
 
@@ -31,6 +33,8 @@ const GMAIL_USER = defineSecret('GMAIL_USER');
 const GMAIL_APP_PASSWORD = defineSecret('GMAIL_APP_PASSWORD');
 // Signs unsubscribe links. Any long random string: firebase functions:secrets:set UNSUB_SECRET
 const UNSUB_SECRET = defineSecret('UNSUB_SECRET');
+// Permanent access token of the Meta system user: firebase functions:secrets:set WHATSAPP_TOKEN
+const WHATSAPP_TOKEN = defineSecret('WHATSAPP_TOKEN');
 const fnBase = () => `https://${REGION.value()}-${process.env.GCLOUD_PROJECT}.cloudfunctions.net`;
 const { FieldValue } = admin.firestore;
 
@@ -261,3 +265,36 @@ exports.unsubscribe = onRequest({ secrets: [UNSUB_SECRET] }, async (req, res) =>
   await admin.firestore().doc(`hotels/${h}/guests/${g}`).update({ marketingOptOut: true, optOutAt: FieldValue.serverTimestamp() }).catch(() => {});
   page('You will not receive offers from this hotel any more. Booking emails will still arrive.');
 });
+
+// ---------- WhatsApp ----------
+exports.sendWhatsApp = onDocumentCreated(
+  { document: 'hotels/{hotelId}/whatsapp/{msgId}', secrets: [WHATSAPP_TOKEN], retry: false },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    const msg = snap.data();
+    if (msg.status !== 'queued') return; // "opened" = sent by staff from their own WhatsApp
+    const { hotelId } = event.params;
+    const db = admin.firestore();
+    const [setS, hotelS] = await Promise.all([db.doc(`hotels/${hotelId}/settings/hotel`).get(), db.doc(`hotels/${hotelId}`).get()]);
+    const settings = setS.exists ? setS.data() : {};
+    const wa = settings.whatsapp || {};
+    const skip = (reason) => snap.ref.update({ status: 'skipped', reason, processedAt: FieldValue.serverTimestamp() });
+    if (hotelS.exists && hotelS.data().status === 'suspended') return skip('hotel paused');
+    if (wa.mode !== 'api' || !wa.api?.phoneNumberId) return skip('WhatsApp Business is not set up');
+    const p = whatsappPayload(msg, wa);
+    if (p.error) return skip(p.error);
+    try {
+      const r = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(wa.api.phoneNumberId)}/messages`, {
+        method: 'POST', headers: { Authorization: `Bearer ${WHATSAPP_TOKEN.value()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(p.body),
+      });
+      const out = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(out?.error?.message || `HTTP ${r.status}`);
+      await snap.ref.update({ status: 'sent', waMessageId: out?.messages?.[0]?.id || '', sentAt: FieldValue.serverTimestamp() });
+    } catch (e) {
+      logger.error('WhatsApp send failed', { hotelId, msgId: snap.id, error: e.message });
+      await snap.ref.update({ status: 'error', error: String(e.message || e).slice(0, 300), processedAt: FieldValue.serverTimestamp() });
+    }
+    return null;
+  },
+);

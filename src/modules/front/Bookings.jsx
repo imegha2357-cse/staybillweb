@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { addDoc, serverTimestamp } from '../../backend/firestore';
 import { hcol } from '../../lib/scope';
 import { actor } from '../../lib/db';
+import { autoWhatsApp, bookingVars, sendWhatsApp, validWaNumber } from '../../lib/whatsapp';
 import { calcNights, round2 } from '../../lib/billing';
 import { addDays } from '../../lib/dates';
 import { useAuth } from '../../context/AuthContext';
@@ -105,6 +106,7 @@ function BookingModal({ open, onClose, initial, bookings, bills }) {
       if (!v.id) data.number = await nextNumber('booking', 'BK');
       const id = await saveRecord(user, 'bookings', v.id, data, v.id ? 'BOOKING_UPDATED' : 'BOOKING_CREATED');
       if (!v.id && sendMail && data.email && data.status === 'Confirmed' && settings.emailGuests !== false) await queueBookingEmail(user, { ...data, id });
+      if (!v.id && sendMail && data.status === 'Confirmed') await autoWhatsApp(user, settings, { kind: 'reservation', phone: data.phone, vars: bookingVars(data, settings), bookingId: id, guestName: data.guestName });
       toast(v.id ? 'Booking saved' : `Booking ${data.number} created`);
       onClose();
     } catch (e2) { toast(errMsg(e2), 'error'); }
@@ -237,6 +239,7 @@ function Calendar({ bookings, bills, onPick, onNew }) {
 export default function Bookings() {
   const nav = useNavigate();
   const { user } = useAuth();
+  const { settings } = useData();
   const toast = useToast();
   const bookings = useLive('bookings');
   const bills = useLive('bills', { where: [['checkOut', '>=', addDays(today(), -1)]] });
@@ -256,6 +259,7 @@ export default function Bookings() {
     try {
       await saveRecord(user, 'bookings', b.id, { status: 'Confirmed' }, 'BOOKING_CONFIRMED');
       if (b.email) await queueBookingEmail(user, { ...b, status: 'Confirmed' });
+      await autoWhatsApp(user, settings, { kind: 'reservation', phone: b.phone, vars: bookingVars(b, settings), bookingId: b.id, guestName: b.guestName });
       toast(`${b.number} confirmed${b.email ? ' and the guest emailed' : ''}`);
     } catch (e) { toast(errMsg(e), 'error'); }
   }
@@ -265,6 +269,10 @@ export default function Bookings() {
       {['Confirmed', 'Requested', 'Enquiry'].includes(b.status) && b.checkIn <= addDays(t, 0) && <Button size="sm" icon="login" onClick={() => nav(`/bills/new?booking=${b.id}`)}>Check in</Button>}
       {['Confirmed', 'Requested', 'Enquiry'].includes(b.status) && b.checkIn > t && <Button size="sm" variant="ghost" icon="login" onClick={() => nav(`/bills/new?booking=${b.id}`)}>Early check-in</Button>}
       {b.billId && <Button size="sm" variant="ghost" icon="receipt_long" onClick={() => nav(`/bills/${b.billId}`)}>Bill</Button>}
+      {['Confirmed', 'Requested', 'Enquiry'].includes(b.status) && validWaNumber(b.phone) && (
+        <Button size="sm" variant="ghost" icon="chat" title="Send the booking confirmation on WhatsApp" aria-label={`WhatsApp ${b.guestName}`}
+          onClick={() => { try { sendWhatsApp(user, settings, { phone: b.phone, kind: 'reservation', vars: bookingVars(b, settings), bookingId: b.id, guestName: b.guestName }); } catch (e) { toast(errMsg(e), 'error'); } }} />
+      )}
       {['Confirmed', 'Requested', 'Enquiry'].includes(b.status) && <>
         {b.checkIn <= t && <Button size="sm" variant="ghost" icon="person_off" onClick={() => setCancel({ b, noShow: true })}>No-show</Button>}
         <Button size="sm" variant="danger-ghost" icon="event_busy" onClick={() => setCancel({ b })}>Cancel</Button>

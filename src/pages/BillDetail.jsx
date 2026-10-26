@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { feedbackUrl } from '../modules/guests/publicLinks';
-import { waLink } from '../modules/guests/messaging';
+import { billVars, sendWhatsApp, validWaNumber, waForBill, waKind, waSettings } from '../lib/whatsapp';
 import { useData } from '../context/DataContext';
 import { getBill, paymentsForBill, listAudit, cancelBill, mailForBill, queueGuestEmail } from '../lib/db';
 import MailStatus from '../components/MailStatus';
@@ -47,6 +47,7 @@ export default function BillDetail() {
   const [payments, setPayments] = useState([]);
   const [audit, setAudit] = useState([]);
   const [mail, setMail] = useState([]);
+  const [wa, setWa] = useState([]);
   const [payOpen, setPayOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(params.get('cancel') === '1');
   const [reason, setReason] = useState(CANCEL_REASONS[0]);
@@ -70,6 +71,7 @@ export default function BillDetail() {
       setPayments(p);
       setAudit(a);
       setMail(m);
+      waForBill(id).then(setWa).catch(() => setWa([]));
     } catch (e) { toast(errMsg(e), 'error'); }
   }, [id, nav, toast]);
 
@@ -129,6 +131,14 @@ export default function BillDetail() {
     } catch (e) { toast(errMsg(e), 'error'); }
     setBusy('');
   }
+  // WhatsApp: opens WhatsApp straight from the click (browsers block it after a delay).
+  function whatsapp(kind, extra = {}) {
+    try {
+      const p = sendWhatsApp(user, settings, { phone: bill.guest?.phone, kind, vars: billVars(bill, settings, extra), billId: bill.id, guestName: bill.guestName });
+      if (waSettings(settings).mode === 'api') toast('WhatsApp message queued');
+      Promise.resolve(p).then(() => waForBill(id)).then(setWa).catch(() => {});
+    } catch (e) { toast(errMsg(e), 'error'); }
+  }
   async function resend(kind) {
     setBusy(`mail-${kind}`);
     try { await queueGuestEmail(user, bill, kind, { manual: true }); toast(`Email to ${bill.guest.email} queued`); setMail(await mailForBill(id)); } catch (e) { toast(errMsg(e), 'error'); }
@@ -156,7 +166,7 @@ export default function BillDetail() {
             <Button variant="secondary" icon="share" onClick={onShare} loading={busy === 'share'}>Share</Button>
             {!cancelled && !bill.checkedOutAt && !paid && mods?.inventory && <Button variant="secondary" icon="local_bar" onClick={() => setMinibar(true)}>Minibar</Button>}
             {!cancelled && !bill.checkedOutAt && <Button variant="secondary" icon="logout" loading={busy === 'checkout'} onClick={onCheckOut}>Check out</Button>}
-            {bill.checkedOutAt && bill.feedbackToken && mods?.feedback && <Button variant="secondary" icon="reviews" onClick={() => { const u = feedbackUrl(hotelId, bill); if (bill.guest?.phone) window.open(waLink(bill.guest.phone, `Thank you for staying with us! How was your stay? ${u}`), '_blank', 'noopener'); else navigator.clipboard?.writeText(u).then(() => toast('Feedback link copied')).catch(() => toast(u)); }}>{bill.guest?.phone ? 'Ask for feedback' : 'Copy feedback link'}</Button>}
+            {bill.checkedOutAt && bill.feedbackToken && mods?.feedback && <Button variant="secondary" icon="reviews" onClick={() => { const u = feedbackUrl(hotelId, bill); if (validWaNumber(bill.guest?.phone)) whatsapp('thankyou', { feedback: u }); else navigator.clipboard?.writeText(u).then(() => toast('Feedback link copied')).catch(() => toast(u)); }}>{validWaNumber(bill.guest?.phone) ? 'Ask for feedback' : 'Copy feedback link'}</Button>}
             {!cancelled && bill.balanceAmount > 0 && <Button icon="add_card" onClick={() => setPayOpen(true)}>Record Payment</Button>}
           </>} />
 
@@ -268,6 +278,34 @@ export default function BillDetail() {
                     <Button size="sm" variant="secondary" icon="send" loading={busy === 'mail-booking'} onClick={() => resend('booking')}>{mail.some((m) => m.kind === 'booking') ? 'Resend' : 'Send'} confirmation</Button>
                     {paid && <Button size="sm" variant="secondary" icon="send" loading={busy === 'mail-paid'} onClick={() => resend('paid')}>{mail.some((m) => m.kind === 'paid') ? 'Resend' : 'Send'} paid receipt</Button>}
                   </div>
+                )}
+              </>
+            )}
+          </Panel>
+
+          {/* WhatsApp */}
+          <Panel title="WhatsApp" icon="chat">
+            {!validWaNumber(bill.guest?.phone) ? (
+              <p className="text-body-md text-on-surface-variant">No mobile number on this bill. Add the guest’s number to send WhatsApp messages.</p>
+            ) : (
+              <>
+                <p className="text-label-md text-on-surface-variant">To <b className="text-on-surface">{bill.guest.phone}</b> · {waSettings(settings).mode === 'api' ? 'sent automatically through WhatsApp Business' : 'opens WhatsApp with the message ready; press send'}</p>
+                {!cancelled && (
+                  <div className="mt-space-sm flex flex-wrap gap-space-sm">
+                    <Button size="sm" variant="secondary" icon="chat" onClick={() => whatsapp('booking')}>Bill details</Button>
+                    {bill.balanceAmount > 0 && <Button size="sm" variant="secondary" icon="notifications_active" onClick={() => whatsapp('reminder')}>Payment reminder</Button>}
+                    {paid && <Button size="sm" variant="secondary" icon="task_alt" onClick={() => whatsapp('paid')}>Payment receipt</Button>}
+                  </div>
+                )}
+                {wa.length > 0 && (
+                  <ul className="mt-space-sm space-y-1.5">
+                    {wa.slice(0, 6).map((m) => (
+                      <li key={m.id} className="flex items-center justify-between gap-2 text-label-md">
+                        <span className="min-w-0 truncate text-on-surface">{waKind(m.kind)?.label || m.kind}<span className="text-on-surface-variant"> · {fmtDateTime(m.createdAt)}</span></span>
+                        <span className={cx('shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-label-sm font-semibold', m.status === 'sent' || m.status === 'delivered' || m.status === 'read' ? 'bg-ok-container text-on-ok-container' : m.status === 'error' ? 'bg-error-container text-on-error-container' : 'bg-surface-container-high text-on-surface-variant')}>{{ opened: 'Opened', queued: 'Sending…', sent: 'Sent', error: 'Failed', skipped: 'Skipped' }[m.status] || m.status}</span>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </>
             )}

@@ -668,6 +668,8 @@ export async function createBill(user, form, computed, initialPayment) {
   try {
     const [bill, settings] = await Promise.all([getBill(res.id), hotelSettings()]);
     res.emailQueued = !!(await autoEmail(user, settings, bill, 'created'));
+    const wa = await import('./whatsapp');
+    await wa.autoWhatsApp(user, settings, { kind: bill.paymentStatus === PAYMENT_STATUS.PAID ? 'paid' : 'booking', phone: bill.guest?.phone, vars: wa.billVars(bill, settings), billId: bill.id, guestName: bill.guestName });
     if (bill.paymentStatus === PAYMENT_STATUS.PAID) await (await import('../modules/billOps')).earnPoints(user, bill, settings);
   } catch { /* the bill is saved; email is best-effort */ }
   return res;
@@ -679,6 +681,8 @@ export async function recordPayment(user, billId, p) {
     if (bill?.paymentStatus === PAYMENT_STATUS.PAID) {
       const settings = await hotelSettings();
       await autoEmail(user, settings, bill, 'paid');
+      const wa = await import('./whatsapp');
+      await wa.autoWhatsApp(user, settings, { kind: 'paid', phone: bill.guest?.phone, vars: wa.billVars(bill, settings), billId: bill.id, guestName: bill.guestName });
       await (await import('../modules/billOps')).earnPoints(user, bill, settings);
     }
   } catch { /* payment is saved; email is best-effort */ }
@@ -686,7 +690,7 @@ export async function recordPayment(user, billId, p) {
 }
 
 // ---------- Backup & restore (PRD §61) ----------
-export const BACKUP_COLLECTIONS = ['settings', 'counters', 'users', 'taxes', 'roomTypes', 'rooms', 'guests', 'bills', 'payments', 'auditLogs'];
+export const BACKUP_COLLECTIONS = ['settings', 'counters', 'users', 'taxes', 'roomTypes', 'rooms', 'guests', 'bills', 'payments', 'auditLogs', 'whatsapp'];
 const RESTORE_SKIP = new Set(['auditLogs', 'users']); // audit trail is append-only; logins are managed separately
 
 function encode(v) {
