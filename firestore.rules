@@ -1,0 +1,314 @@
+rules_version = '2';
+
+// StayBill Firestore security rules: one site, many hotels.
+//   /users/{uid}  { role: 'admin' | 'owner' | 'employee', hotelId, status: 'active' | 'inactive', username, name }
+//   /hotels/{hotelId}            hotel record (name, city, status: 'active' | 'suspended')
+//   /hotels/{hotelId}/...        everything that belongs to that hotel
+//   /publicHotels, /publicFeedback  what the public booking and feedback pages may read
+//   /plans, /subscriptionPayments, /signupRequests  subscriptions (administrator)
+// admin    = runs the whole site: adds hotels and owner logins, can open any hotel.
+// owner    = manages one hotel and its employees' logins.
+// employee = front desk of one hotel; extra actions are switched on by the owner.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function active() { return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && me().status == 'active'; }
+    function isSiteAdmin() { return active() && me().role == 'admin'; }
+    function hotelOpen(h) { return get(/databases/$(database)/documents/hotels/$(h)).data.get('status', 'active') == 'active'; }
+    function inHotel(h) { return isSiteAdmin() || (active() && me().hotelId == h && hotelOpen(h)); }
+    function manages(h) { return isSiteAdmin() || (inHotel(h) && me().role == 'owner'); }
+    function perm(h, key) {
+      return manages(h) || (inHotel(h) &&
+        get(/databases/$(database)/documents/hotels/$(h)/settings/hotel).data.get('permissions', {}).get(key, false) == true);
+    }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function hotelSettings(h) { return get(/databases/$(database)/documents/hotels/$(h)/settings/hotel).data; }
+    // A module the owner may let employees use (Settings → Modules → staff access).
+    function canMod(h, mod, staffDefault) {
+      return manages(h) || (inHotel(h) && hotelSettings(h).get('staffAccess', {}).get(mod, staffDefault) == true);
+    }
+    // Night audit: employees cannot change bills of a closed day.
+    function dayOpen(h, d) { return manages(h) || d > hotelSettings(h).get('closedThrough', ''); }
+    function platformReady() { return exists(/databases/$(database)/documents/meta/platform); }
+
+    // ---------- First-run setup: the very first login becomes the site administrator ----------
+    match /meta/platform {
+      allow read: if true; // only tells the sign-in page whether setup has happened
+      allow create: if signedIn() && !platformReady()
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow update, delete: if false;
+    }
+    match /meta/{other} {
+      allow read: if isSiteAdmin() || (other == 'billing' && active());
+      allow write: if isSiteAdmin();
+    }
+
+    // ---------- Running StayBill as a service ----------
+    match /plans/{id} {
+      allow read: if true; // shown on the public sign-up page
+      allow write: if isSiteAdmin();
+    }
+    match /subscriptionPayments/{id} {
+      allow read: if isSiteAdmin() || (active() && me().role == 'owner' && resource.data.hotelId == me().hotelId);
+      allow write: if isSiteAdmin();
+    }
+    match /signupRequests/{id} {
+      allow create: if request.resource.data.status == 'New'
+        && request.resource.data.hotelName is string && request.resource.data.hotelName.size() < 120
+        && request.resource.data.keys().hasOnly(['hotelName', 'city', 'rooms', 'ownerName', 'phone', 'email', 'username', 'planId', 'message', 'status', 'date', 'createdAt']);
+      allow read, update, delete: if isSiteAdmin();
+    }
+
+    // ---------- Public pages (no sign-in) ----------
+    // Booking page profile: name, photos, room types, rates and sold-out dates only.
+    match /publicHotels/{h} {
+      allow read: if true;
+      allow write: if manages(h);
+    }
+    // Feedback card for one stay; its id contains the bill id, and the token proves the link.
+    match /publicFeedback/{id} {
+      allow read: if true;
+      allow create: if inHotel(request.resource.data.hotelId);
+      allow update: if inHotel(resource.data.hotelId)
+        || (request.resource.data.token == resource.data.token && changed().hasOnly(['done']));
+      allow delete: if false;
+    }
+
+    // ---------- Logins ----------
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isSiteAdmin()
+        || (active() && resource.data.hotelId == me().hotelId && me().role == 'owner')
+        || (active() && resource.data.hotelId == me().hotelId && request.auth.uid != uid && resource.data.role in ['owner', 'employee']));
+      allow create: if
+        // first run: the administrator's own profile, written together with /meta/platform
+        (signedIn() && request.auth.uid == uid && !platformReady()
+          && existsAfter(/databases/$(database)/documents/meta/platform)
+          && request.resource.data.role == 'admin' && request.resource.data.status == 'active')
+        // the administrator adds anyone
+        || isSiteAdmin()
+        // an owner adds employees to their own hotel
+        || (active() && me().role == 'owner' && request.resource.data.role == 'employee'
+          && request.resource.data.hotelId == me().hotelId && request.resource.data.status == 'active');
+      allow update: if isSiteAdmin()
+        || (active() && me().role == 'owner' && resource.data.role == 'employee' && resource.data.hotelId == me().hotelId
+          && !changed().hasAny(['role', 'hotelId', 'username']))
+        // anyone may edit their own name / phone
+        || (active() && request.auth.uid == uid && changed().hasOnly(['name', 'phone', 'updatedAt', 'updatedBy']));
+      allow delete: if false;
+    }
+
+    // ---------- Hotels ----------
+    match /hotels/{h} {
+      allow read: if inHotel(h) || (active() && me().hotelId == h);
+      allow create, delete: if isSiteAdmin();
+      allow update: if isSiteAdmin()
+        || (manages(h) && changed().hasOnly(['ownerUid', 'ownerName', 'ownerUsername', 'updatedAt', 'updatedBy']));
+
+      // Configuration
+      match /settings/{id} {
+        allow read: if inHotel(h);
+        allow write: if manages(h);
+      }
+      match /gallery/{id} {
+        allow read: if inHotel(h);
+        allow write: if manages(h);
+      }
+      match /taxes/{id} { allow read: if inHotel(h); allow write: if manages(h); }
+      match /roomTypes/{id} { allow read: if inHotel(h); allow write: if manages(h); }
+      match /rooms/{id} {
+        allow read: if inHotel(h);
+        allow create, update: if perm(h, 'receptionistCanManageRooms');
+        // housekeeping / maintenance status from any staff member
+        allow update: if inHotel(h) && changed().hasOnly(['hkStatus', 'hkUpdatedAt', 'hkUpdatedBy', 'hkNote', 'oooReason', 'oooUntil', 'oooTicket']);
+        allow delete: if manages(h);
+      }
+
+      // Counters (invoice, bookings, KOTs, purchase orders, credit notes…): staff may only move them forward by one.
+      match /counters/{name} {
+        allow read: if inHotel(h);
+        allow create: if inHotel(h) && request.resource.data.next == 2;
+        allow update: if manages(h) || (inHotel(h) && request.resource.data.next == resource.data.next + 1);
+        allow delete: if false;
+      }
+      match /counters/invoice {
+        allow read: if inHotel(h);
+        allow create: if manages(h);
+        allow update: if manages(h) || (inHotel(h) && request.resource.data.next == resource.data.next + 1);
+        allow delete: if false;
+      }
+
+      // Guests
+      match /guests/{id} {
+        allow read, create, update: if inHotel(h);
+        allow delete: if manages(h);
+      }
+
+      // Bills
+      function validAmounts(d) {
+        return d.grandTotal is number && d.grandTotal >= 0
+          && d.paidAmount is number && d.paidAmount >= 0
+          && d.paidAmount <= d.grandTotal + 0.01
+          && d.balanceAmount is number && d.balanceAmount >= 0;
+      }
+      match /bills/{id} {
+        allow read: if inHotel(h);
+        allow create: if manages(h) || (inHotel(h)
+          && validAmounts(request.resource.data)
+          && request.resource.data.createdBy.uid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/hotels/$(h)/counters/invoice).data.next == request.resource.data.invoiceSeq + 1
+          && request.resource.data.invoiceNumber is string
+          && request.resource.data.paymentStatus != 'CANCELLED');
+        allow update: if manages(h) || (inHotel(h)
+          && resource.data.paymentStatus != 'CANCELLED'
+          && validAmounts(request.resource.data)
+          && !changed().hasAny(['invoiceNumber', 'invoiceSeq', 'billDate', 'createdBy', 'createdAt'])
+          && (
+            changed().hasOnly(['paidAmount', 'balanceAmount', 'paymentStatus', 'paymentMethods', 'lastPaymentAt', 'updatedAt', 'updatedBy'])
+              && request.resource.data.paymentStatus != 'CANCELLED'
+              && request.resource.data.paidAmount > resource.data.paidAmount
+            // check-out stamp, loyalty points earned
+            || changed().hasOnly(['checkedOutAt', 'checkedOutBy', 'checkedOutOn', 'feedbackToken', 'thankYouQueued', 'loyaltyEarned'])
+            // restaurant / minibar charges added to an open bill (totals can only go up)
+            || changed().hasOnly(['items', 'additionalTotal', 'subtotal', 'discountAmount', 'taxableAmount', 'taxes', 'taxAmount', 'grandTotal', 'balanceAmount', 'paymentStatus', 'updatedAt', 'updatedBy'])
+              && resource.data.paymentStatus != 'PAID' && !('checkedOutAt' in resource.data)
+              && request.resource.data.paidAmount == resource.data.paidAmount
+              && request.resource.data.grandTotal >= resource.data.grandTotal
+              && request.resource.data.items.size() > resource.data.items.size()
+            || perm(h, 'receptionistCanEditBills') && dayOpen(h, resource.data.billDate)
+              && resource.data.paymentStatus != 'PAID'
+              && request.resource.data.paymentStatus != 'CANCELLED'
+              && request.resource.data.paidAmount == resource.data.paidAmount
+            || perm(h, 'receptionistCanCancelBills') && dayOpen(h, resource.data.billDate)
+              && request.resource.data.paymentStatus == 'CANCELLED'
+              && changed().hasOnly(['paymentStatus', 'statusBeforeCancel', 'cancelReason', 'cancelledBy', 'cancelledAt', 'updatedAt', 'updatedBy'])
+          ));
+        allow delete: if false; // bills are cancelled, never deleted
+      }
+
+      // Payments
+      match /payments/{id} {
+        allow read: if inHotel(h);
+        allow create: if manages(h) || (inHotel(h)
+          && request.resource.data.amount is number && request.resource.data.amount > 0
+          && request.resource.data.receivedBy.uid == request.auth.uid
+          && existsAfter(/databases/$(database)/documents/hotels/$(h)/bills/$(request.resource.data.billId)));
+        allow update: if manages(h); // backup restore only
+        allow delete: if false;
+      }
+
+      // Guest email requests: staff ask for an email about one of this hotel's bills;
+      // only the Cloud Function (admin SDK) sends it and records the result.
+      match /mail/{id} {
+        allow read: if inHotel(h);
+        allow create: if inHotel(h) && request.resource.data.status == 'queued' && (
+          // about a bill: confirmation, paid in full, thank-you after check-out
+          (request.resource.data.kind in ['booking', 'paid', 'thankyou']
+            && exists(/databases/$(database)/documents/hotels/$(h)/bills/$(request.resource.data.billId))
+            && request.resource.data.requestedBy.uid == request.auth.uid)
+          // about a booking: reservation confirmation
+          || (request.resource.data.kind == 'reservation'
+            && exists(/databases/$(database)/documents/hotels/$(h)/bookings/$(request.resource.data.bookingId))
+            && request.resource.data.requestedBy.uid == request.auth.uid)
+          // marketing campaign to a guest (owners, or staff the owner allowed)
+          || (request.resource.data.kind == 'campaign' && canMod(h, 'campaigns', false)
+            && request.resource.data.createdBy.uid == request.auth.uid));
+        allow update, delete: if false;
+      }
+
+      // ---------- Front desk ----------
+      match /bookings/{id} {
+        allow read: if canMod(h, 'bookings', true);
+        allow update: if canMod(h, 'bookings', true)
+          || (inHotel(h) && changed().hasOnly(['status', 'billId', 'updatedAt', 'updatedBy'])); // check-in / check-out from a bill
+        allow create: if canMod(h, 'bookings', true);
+        // the public booking page: a request only, never a confirmed booking
+        allow create: if hotelOpen(h) && request.resource.data.status == 'Requested' && request.resource.data.source == 'Website'
+          && request.resource.data.keys().hasOnly(['number', 'status', 'source', 'guestName', 'phone', 'email', 'checkIn', 'checkOut', 'roomType', 'rooms', 'adults', 'children', 'rate', 'notes', 'createdAt', 'createdBy'])
+          && request.resource.data.guestName is string && request.resource.data.guestName.size() < 100
+          && request.resource.data.rooms is int && request.resource.data.rooms <= 10
+          && get(/databases/$(database)/documents/publicHotels/$(h)).data.open == true;
+        allow delete: if manages(h);
+      }
+      match /channels/{id} { allow read: if inHotel(h); allow write: if canMod(h, 'channels', false); }
+      match /nightAudits/{id} { allow read: if inHotel(h); allow write: if canMod(h, 'nightaudit', false); }
+
+      // ---------- Restaurant ----------
+      match /menuItems/{id} { allow read: if inHotel(h); allow write: if canMod(h, 'menu', false); }
+      match /orders/{id} {
+        allow read, create, update: if canMod(h, 'pos', true) || canMod(h, 'kitchen', true);
+        allow delete: if manages(h);
+      }
+
+      // ---------- Operations ----------
+      match /hkTasks/{id} { allow read, create, update: if inHotel(h); allow delete: if manages(h); }
+      match /tickets/{id} { allow read, create, update: if inHotel(h); allow delete: if manages(h); }
+      match /pmTasks/{id} { allow read: if inHotel(h); allow write: if canMod(h, 'maintenance', true); }
+      match /lostFound/{id} { allow read, create, update: if canMod(h, 'lostfound', true); allow delete: if manages(h); }
+      match /assets/{id} { allow read: if inHotel(h); allow write: if canMod(h, 'assets', false); }
+
+      // ---------- Stock ----------
+      // Stock moves come from many places (kitchen use, minibar, deliveries), so any staff member may record them.
+      match /stockItems/{id} {
+        allow read: if inHotel(h);
+        allow create, delete: if canMod(h, 'inventory', true);
+        allow update: if canMod(h, 'inventory', true) || (inHotel(h) && changed().hasOnly(['qty', 'updatedAt', 'costPrice', 'supplierName']));
+      }
+      match /stockMoves/{id} { allow read: if inHotel(h); allow create: if inHotel(h); allow update, delete: if false; }
+      match /purchaseOrders/{id} {
+        allow read: if canMod(h, 'purchases', true);
+        allow create: if manages(h) || (canMod(h, 'purchases', true) && request.resource.data.status == 'Requested');
+        // only the owner approves, rejects or cancels
+        allow update: if manages(h) || (canMod(h, 'purchases', true)
+          && !(request.resource.data.status in ['Approved', 'Rejected', 'Cancelled'] && request.resource.data.status != resource.data.status));
+        allow delete: if false;
+      }
+      match /suppliers/{id} { allow read: if canMod(h, 'suppliers', false) || canMod(h, 'purchases', true); allow write: if canMod(h, 'suppliers', false); }
+      match /supplierPayments/{id} { allow read, create: if canMod(h, 'suppliers', false); allow update, delete: if false; }
+
+      // ---------- Team ----------
+      match /attendance/{id} {
+        allow read: if manages(h) || (inHotel(h) && resource.data.personId == request.auth.uid);
+        allow create: if manages(h) || (inHotel(h) && request.resource.data.personId == request.auth.uid && request.resource.data.by == 'self');
+        allow update: if manages(h) || (inHotel(h) && resource.data.personId == request.auth.uid && resource.data.by == 'self'
+          && changed().hasOnly(['out', 'hours', 'status', 'updatedAt', 'updatedBy']));
+        allow delete: if manages(h);
+      }
+      match /shifts/{id} { allow read: if inHotel(h); allow write: if manages(h); }
+      match /leaves/{id} {
+        allow read: if manages(h) || (inHotel(h) && resource.data.personId == request.auth.uid);
+        allow create: if manages(h) || (inHotel(h) && request.resource.data.personId == request.auth.uid && request.resource.data.status == 'Pending');
+        allow update: if manages(h) || (inHotel(h) && resource.data.personId == request.auth.uid && request.resource.data.status == 'Cancelled' && changed().hasOnly(['status', 'updatedAt', 'updatedBy']));
+        allow delete: if false;
+      }
+      match /payProfiles/{id} { allow read, write: if canMod(h, 'payroll', false); }
+      match /payslips/{id} { allow read: if canMod(h, 'payroll', false) || (inHotel(h) && resource.data.personId == request.auth.uid); allow write: if canMod(h, 'payroll', false); }
+      match /salaryAdvances/{id} { allow read, write: if canMod(h, 'payroll', false); }
+
+      // ---------- Guests ----------
+      match /feedback/{id} {
+        allow read, update: if canMod(h, 'feedback', true);
+        allow create: if canMod(h, 'feedback', true)
+          // from the guest's own link: the token must match the stay's feedback card
+          || (request.resource.data.source == 'Guest link' && request.resource.data.rating is int
+            && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+            && get(/databases/$(database)/documents/publicFeedback/$(h + '_' + request.resource.data.billId)).data.token == request.resource.data.token);
+        allow delete: if manages(h);
+      }
+      match /campaigns/{id} { allow read, write: if canMod(h, 'campaigns', false); }
+      match /loyaltyTx/{id} { allow read, create: if inHotel(h); allow update, delete: if false; }
+
+      // ---------- Finance ----------
+      match /expenses/{id} { allow read, write: if canMod(h, 'expenses', false); }
+      match /creditNotes/{id} { allow read, create, update: if canMod(h, 'creditnotes', false); allow delete: if false; }
+
+      // Audit log (append-only)
+      match /auditLogs/{id} {
+        allow read: if inHotel(h);
+        allow create: if inHotel(h) && request.resource.data.user.uid == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+  }
+}
