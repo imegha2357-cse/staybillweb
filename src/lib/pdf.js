@@ -12,7 +12,7 @@ async function libs() {
 
 const DARK = [15, 23, 42];
 const MUTED = [100, 116, 139];
-const BRAND = [23, 118, 107];
+const BRAND = [15, 42, 74]; // navy #0F2A4A
 
 export async function buildInvoicePdf(bill, settings, payments, into) {
   const { jsPDF, autoTable } = await libs();

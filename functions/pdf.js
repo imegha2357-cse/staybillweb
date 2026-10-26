@@ -12,7 +12,7 @@ function invoicePdf(bill, settings = {}, payments = []) {
     const cur = settings.currency || 'INR';
     const m = (n) => money(n, cur, { pdf: true });
     const W = doc.page.width - 96;
-    const teal = '#0F5E66';
+    const teal = '#0F2A4A';
 
     doc.fillColor(teal).font('Helvetica-Bold').fontSize(18).text(settings.hotelName || 'Hotel', 48, 48);
     doc.fillColor('#45464d').font('Helvetica').fontSize(9)

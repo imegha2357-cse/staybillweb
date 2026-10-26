@@ -50,16 +50,16 @@ function decide({ mail, bill, booking, guest, settings = {}, hotel = {} }) {
   return { send: true, to };
 }
 
-const ACCENT = '#0F5E66';
+const ACCENT = '#0F2A4A';
 function shell(settings, label, inner, footerExtra = '') {
   const hotel = settings.hotelName || 'Our hotel';
-  return `<!doctype html><html><body style="margin:0;background:#f5fafa;font-family:Arial,Helvetica,sans-serif;color:#0b1c30">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5fafa;padding:24px 0"><tr><td align="center">
+  return `<!doctype html><html><body style="margin:0;background:#f6f7fa;font-family:Arial,Helvetica,sans-serif;color:#0b1c30">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fa;padding:24px 0"><tr><td align="center">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden">
 <tr><td style="background:${ACCENT};padding:22px 28px;color:#ffffff"><div style="font-size:20px;font-weight:bold">${esc(hotel)}</div>
 <div style="font-size:13px;opacity:.85">${esc([settings.address, settings.city].filter(Boolean).join(', '))}</div></td></tr>
-<tr><td style="padding:24px 28px">${label ? `<p style="margin:0 0 10px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#F2785C;font-weight:bold">${esc(label)}</p>` : ''}${inner}</td></tr>
-<tr><td style="padding:14px 28px;background:#f0f5f5;font-size:11px;color:#7a8a8e">${esc(hotel)}${settings.phone ? ` · ${esc(settings.phone)}` : ''} · Sent by StayBill${footerExtra}</td></tr>
+<tr><td style="padding:24px 28px">${label ? `<p style="margin:0 0 10px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#A8832F;font-weight:bold">${esc(label)}</p>` : ''}${inner}</td></tr>
+<tr><td style="padding:14px 28px;background:#eef1f6;font-size:11px;color:#7a8a8e">${esc(hotel)}${settings.phone ? ` · ${esc(settings.phone)}` : ''} · Sent by StayBill${footerExtra}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 /** Plain text → safe HTML paragraphs with clickable links. */
@@ -79,7 +79,7 @@ function buildReservationEmail(b, settings = {}) {
   const subject = `Reservation confirmed: ${b.number || ''} at ${hotel}`.replace('  ', ' ');
   const rows = [['Reservation', b.number || ''], ['Room type', `${b.roomType || 'Room'}${rooms > 1 ? ` × ${rooms}` : ''}`], ['Check-in', day(b.checkIn)], ['Check-out', day(b.checkOut)], ['Nights', String(nights)], ['Guests', `${b.adults || 1} adult${Number(b.adults) === 1 || !b.adults ? '' : 's'}${b.children ? `, ${b.children} child${b.children > 1 ? 'ren' : ''}` : ''}`], ['Estimated room charges', money(total, cur)], ...(b.advance ? [['Advance received', money(b.advance, cur)]] : [])];
   const inner = `<p style="margin:0 0 18px;font-size:15px;line-height:1.5">Dear ${esc(first)}, your reservation at ${esc(hotel)} is confirmed. We look forward to welcoming you.</p>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px">${rows.map(([k, v]) => `<tr><td style="color:#5b6b70;padding:5px 0;border-bottom:1px solid #f0f5f5">${esc(k)}</td><td align="right" style="padding:5px 0;border-bottom:1px solid #f0f5f5;font-weight:bold">${esc(v)}</td></tr>`).join('')}</table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px">${rows.map(([k, v]) => `<tr><td style="color:#5b6b70;padding:5px 0;border-bottom:1px solid #eef1f6">${esc(k)}</td><td align="right" style="padding:5px 0;border-bottom:1px solid #eef1f6;font-weight:bold">${esc(v)}</td></tr>`).join('')}</table>
 <p style="margin:18px 0 0;font-size:13px;color:#5b6b70">Taxes are added at check-out. ${settings.phone ? `To change or cancel, call ${esc(settings.phone)}.` : ''}</p>`;
   const text = [`${hotel}`, '', `Dear ${first}, your reservation is confirmed.`, '', ...rows.map(([k, v]) => `${k}: ${v}`), '', settings.phone ? `To change or cancel, call ${settings.phone}.` : ''].join('\n');
   return { subject, html: shell(settings, 'Reservation confirmed', inner), text };
@@ -125,16 +125,16 @@ function buildEmail(kind, bill, settings = {}) {
     ? `Thank you, ${first}. We have received full payment for your stay. Your invoice is attached as a PDF.`
     : `Thank you for choosing ${hotel}, ${first}. Here are the details of your stay and bill.`;
   const status = bill.paymentStatus === 'PAID' ? 'Paid in full' : bill.paymentStatus === 'PARTIALLY_PAID' ? 'Partly paid' : 'Payment pending';
-  const accent = '#0F5E66';
-  const html = `<!doctype html><html><body style="margin:0;background:#f5fafa;font-family:Arial,Helvetica,sans-serif;color:#0b1c30">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5fafa;padding:24px 0"><tr><td align="center">
+  const accent = '#0F2A4A';
+  const html = `<!doctype html><html><body style="margin:0;background:#f6f7fa;font-family:Arial,Helvetica,sans-serif;color:#0b1c30">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fa;padding:24px 0"><tr><td align="center">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden">
 <tr><td style="background:${accent};padding:22px 28px;color:#ffffff">
   <div style="font-size:20px;font-weight:bold">${esc(hotel)}</div>
   <div style="font-size:13px;opacity:.85">${esc([settings.address, settings.city].filter(Boolean).join(', '))}</div>
 </td></tr>
 <tr><td style="padding:24px 28px">
-  <p style="margin:0 0 6px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#F2785C;font-weight:bold">${paidFull ? 'Payment received' : 'Booking confirmation'}</p>
+  <p style="margin:0 0 6px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#A8832F;font-weight:bold">${paidFull ? 'Payment received' : 'Booking confirmation'}</p>
   <p style="margin:0 0 18px;font-size:15px;line-height:1.5">${esc(intro)}</p>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;margin-bottom:16px">
     <tr><td style="color:#5b6b70;padding:3px 0">Invoice</td><td align="right" style="font-weight:bold">${esc(bill.invoiceNumber)}</td></tr>
@@ -143,8 +143,8 @@ function buildEmail(kind, bill, settings = {}) {
     <tr><td style="color:#5b6b70;padding:3px 0">Check-out</td><td align="right">${esc(day(bill.checkOut))}</td></tr>
     <tr><td style="color:#5b6b70;padding:3px 0">Nights</td><td align="right">${nights}</td></tr>
   </table>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;border-top:1px solid #e3eeee">
-    ${rows.map(([l, a]) => `<tr><td style="padding:7px 0;border-bottom:1px solid #f0f5f5">${esc(l)}</td><td align="right" style="padding:7px 0;border-bottom:1px solid #f0f5f5">${a < 0 ? '-' : ''}${esc(money(Math.abs(a || 0), cur))}</td></tr>`).join('')}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;border-top:1px solid #e2e7ef">
+    ${rows.map(([l, a]) => `<tr><td style="padding:7px 0;border-bottom:1px solid #eef1f6">${esc(l)}</td><td align="right" style="padding:7px 0;border-bottom:1px solid #eef1f6">${a < 0 ? '-' : ''}${esc(money(Math.abs(a || 0), cur))}</td></tr>`).join('')}
     <tr><td style="padding:10px 0;font-weight:bold;font-size:16px">Total</td><td align="right" style="padding:10px 0;font-weight:bold;font-size:16px">${esc(money(bill.grandTotal, cur))}</td></tr>
     <tr><td style="padding:3px 0;color:#5b6b70">Paid</td><td align="right">${esc(money(bill.paidAmount, cur))}</td></tr>
     <tr><td style="padding:3px 0;color:#5b6b70">Balance</td><td align="right" style="font-weight:bold;color:${bill.balanceAmount > 0 ? '#ba1a1a' : '#14532d'}">${esc(money(bill.balanceAmount, cur))}</td></tr>
@@ -152,7 +152,7 @@ function buildEmail(kind, bill, settings = {}) {
   <p style="margin:18px 0 0;display:inline-block;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:bold;background:${bill.paymentStatus === 'PAID' ? '#dcf3e4;color:#14532d' : '#fdefc8;color:#7a4b00'}">${status}</p>
   <p style="margin:22px 0 0;font-size:13px;color:#5b6b70;line-height:1.5">${esc(settings.invoiceFooter || 'Thank you for staying with us.')}${settings.phone ? `<br>Questions? Call ${esc(settings.phone)}` : ''}${settings.email ? ` or reply to this email.` : ''}</p>
 </td></tr>
-<tr><td style="padding:14px 28px;background:#f0f5f5;font-size:11px;color:#7a8a8e">${esc(hotel)}${settings.gstin ? ` · GSTIN ${esc(settings.gstin)}` : ''} · Sent by StayBill</td></tr>
+<tr><td style="padding:14px 28px;background:#eef1f6;font-size:11px;color:#7a8a8e">${esc(hotel)}${settings.gstin ? ` · GSTIN ${esc(settings.gstin)}` : ''} · Sent by StayBill</td></tr>
 </table></td></tr></table></body></html>`;
   const text = [
     `${hotel}`, '', intro, '',

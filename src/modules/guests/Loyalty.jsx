@@ -132,7 +132,7 @@ export default function Loyalty() {
       {tab === 'tiers' && (
         <div className="grid gap-space-md sm:grid-cols-3">
           {[...(L.tiers || LOYALTY_DEFAULTS.tiers)].sort((a, b) => a.min - b.min).map((t) => (
-            <div key={t.name} className="rounded-xl bg-gradient-to-br from-primary to-secondary p-space-lg text-on-primary shadow-sm">
+            <div key={t.name} className="rounded-xl bg-gradient-to-br from-primary to-primary-container p-space-lg text-on-primary shadow-sm">
               <div className="text-label-md uppercase tracking-wider opacity-80">From {money(t.min)} lifetime</div>
               <div className="font-headline text-headline-lg">{t.name}</div>
               <div className="mt-2 text-body-md opacity-90">{members.filter((g) => g.tier === t.name).length} guests</div>

@@ -16,7 +16,7 @@ const fmt = (d) => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { weekd
 export function PublicShell({ hotel, children }) {
   return (
     <div className="min-h-screen bg-surface">
-      <header className="bg-gradient-to-br from-primary to-secondary text-on-primary">
+      <header className="bg-gradient-to-br from-primary to-primary-container text-on-primary">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-5">
           {hotel?.logo ? <img src={hotel.logo} alt="" className="h-12 w-12 rounded-xl bg-white object-contain p-1" /> : <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15"><Icon name="hotel" size={26} /></span>}
           <div className="min-w-0">

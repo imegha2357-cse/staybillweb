@@ -44,10 +44,10 @@ function ClockCard({ me, row, cfg, shift }) {
     setBusy(false);
   }
   return (
-    <div className="flex flex-wrap items-center justify-between gap-space-md rounded-xl bg-gradient-to-br from-primary to-secondary p-space-lg text-on-primary shadow-sm">
+    <div className="flex flex-wrap items-center justify-between gap-space-md rounded-xl bg-gradient-to-br from-primary to-primary-container p-space-lg text-on-primary shadow-sm">
       <div>
         <div className="text-label-md uppercase tracking-wider opacity-80">{fmtDate(today())}{shift ? ` · ${shift.name || 'Shift'} ${shift.start}–${shift.end}` : ` · Starts ${cfg.start}`}</div>
-        <div className="font-headline text-display-sm font-bold tabular-nums">{now}</div>
+        <div className="font-headline text-[2.5rem] font-bold leading-tight tabular-nums">{now}</div>
         <div className="text-body-md opacity-90">
           {!row ? `Hello ${me.name.split(' ')[0]}, you haven’t clocked in yet.` : row.out ? `Done for today: ${row.in} – ${row.out} (${row.hours} h).` : `Clocked in at ${row.in}${row.status === 'Late' ? ' · late' : ''}.`}
         </div>

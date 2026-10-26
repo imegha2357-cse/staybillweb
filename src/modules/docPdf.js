@@ -13,7 +13,7 @@ export async function buildDocPdf(spec) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: spec.landscape ? 'landscape' : 'portrait' });
   const W = doc.internal.pageSize.getWidth();
   const s = spec.settings || {};
-  const teal = [0, 95, 115];
+  const teal = [15, 42, 74]; // brand navy #0F2A4A
   doc.setFillColor(...teal); doc.rect(0, 0, W, 4, 'F');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(20, 30, 40);
   doc.text(s.hotelName || 'Hotel', 14, 16);

@@ -129,7 +129,7 @@ function BrandSettings() {
   const { user } = useAuth();
   const { settings } = useData();
   const toast = useToast();
-  const saved = settings.brand || DEFAULT_BRAND;
+  const saved = settings.brand && !(settings.brand.id === 'ocean' && !settings.brand.chosen) ? settings.brand : DEFAULT_BRAND;
   const [brand, setBrand] = useState(saved);
   const [custom, setCustom] = useState(() => {
     const r = resolveBrand(saved);
@@ -149,7 +149,7 @@ function BrandSettings() {
   async function save() {
     setBusy(true);
     try {
-      await saveSettings(user, { brand: brand.id === 'custom' ? { id: 'custom', ...custom } : { id: brand.id } }, 'BRAND_COLOURS_UPDATED');
+      await saveSettings(user, { brand: brand.id === 'custom' ? { id: 'custom', ...custom } : { id: brand.id, chosen: true } }, 'BRAND_COLOURS_UPDATED');
       applyBrand(brand);
       toast('Brand colours saved for everyone');
     } catch (e) { toast(errMsg(e), 'error'); }
@@ -171,7 +171,7 @@ function BrandSettings() {
           const on = brand.id === p.id;
           return (
             <button key={p.id} type="button" role="radio" aria-checked={on}
-              onClick={() => (p.id === 'custom' ? pickCustom(custom) : setBrand({ id: p.id }))}
+              onClick={() => (p.id === 'custom' ? pickCustom(custom) : setBrand({ id: p.id, chosen: true }))}
               className={`flex items-center gap-3 rounded-xl p-3 text-left ring-1 transition ${on ? 'bg-surface-container-low ring-2 ring-secondary' : 'ring-outline-variant/60 hover:bg-surface-container-low'}`}>
               <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-lg ring-1 ring-black/10" style={{ background: p.background }} aria-hidden="true">
                 <span className="absolute inset-y-0 left-0 w-1/2" style={{ background: p.primary }} />

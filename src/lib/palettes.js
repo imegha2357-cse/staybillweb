@@ -3,13 +3,13 @@
 // hotel can also enter its own colours.
 
 export const PALETTES = [
+  { id: 'navy', name: 'Royal Navy & Gold', tagline: 'Classic, premium, trusted (default)', primary: '#0F2A4A', accent: '#C9A24B', background: '#F8F6F1', night: '#0A1628' },
   { id: 'ocean', name: 'Ocean Teal & Coral', tagline: 'Fresh, relaxed, friendly', primary: '#0F5E66', accent: '#F2785C', background: '#F5FAFA', night: '#06232A' },
-  { id: 'navy', name: 'Royal Navy & Gold', tagline: 'Classic, premium, trusted', primary: '#0F2A4A', accent: '#C9A24B', background: '#F8F6F1', night: '#0A1628' },
   { id: 'emerald', name: 'Emerald & Brass', tagline: 'Calm, natural, heritage', primary: '#0E4D3C', accent: '#B08D57', background: '#F7F4EC', night: '#08201A' },
   { id: 'terracotta', name: 'Terracotta & Sand', tagline: 'Warm, homely, boutique', primary: '#A4502E', accent: '#E2C08D', background: '#FBF7F2', night: '#1E120D' },
 ];
-export const DEFAULT_BRAND = { id: 'ocean' };
-const CACHE_KEY = 'staybill-brand-v1';
+export const DEFAULT_BRAND = { id: 'navy' };
+const CACHE_KEY = 'staybill-brand-v2';
 
 // ---------- colour maths ----------
 const clamp = (n, a = 0, b = 1) => Math.min(b, Math.max(a, n));
@@ -56,6 +56,8 @@ const triplet = (hex) => hexToRgb(hex).join(' ');
 
 /** Normalises a stored brand value ({id} or {id:'custom', primary, accent, ...}). */
 export function resolveBrand(brand) {
+  // Hotels that never picked colours themselves follow the default (navy).
+  if (brand?.id === 'ocean' && !brand.chosen) return PALETTES[0];
   const preset = PALETTES.find((p) => p.id === brand?.id);
   if (preset) return preset;
   if (brand?.id === 'custom' && isHex(brand.primary) && isHex(brand.accent)) {
