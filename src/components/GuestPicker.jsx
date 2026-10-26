@@ -43,7 +43,7 @@ export default function GuestPicker({ guestId, guest, onChange, errors = {} }) {
       <div className="mb-4 inline-flex rounded-lg bg-slate-100 p-1 text-sm">
         {[{ id: 'existing', label: 'Existing guest', icon: UserCheck }, { id: 'new', label: 'New guest', icon: UserPlus }].map(({ id, label, icon: Icon }) => (
           <button type="button" key={id} onClick={() => { setMode(id); if (id === 'new') { clear(); } setDup(null); }}
-            className={cx('flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium', mode === id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500')}>
+            className={cx('flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium', mode === id ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-slate-500')}>
             <Icon className="h-4 w-4" />{label}
           </button>
         ))}
@@ -55,13 +55,13 @@ export default function GuestPicker({ guestId, guest, onChange, errors = {} }) {
           <Input className="pl-9" placeholder="Search by guest name or phone…" value={term}
             onChange={(e) => { setTerm(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} autoFocus />
           {open && (
-            <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+            <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-outline-variant/40 bg-surface-container-lowest shadow-lg">
               {results.length === 0 ? (
                 <div className="px-3 py-3 text-sm text-slate-500">No matching guests. <button type="button" className="font-medium text-brand-700" onClick={() => { setMode('new'); onChange({ guestId: null, guest: { ...guest, name: /\d/.test(term) ? '' : term, phone: /\d/.test(term) ? term : '' } }); }}>Add as new guest</button></div>
               ) : results.map((g) => (
-                <button type="button" key={g.id} onClick={() => pick(g)} className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-slate-50">
-                  <span className="font-medium text-slate-800">{g.name}</span>
-                  <span className="text-slate-500">{g.phone}</span>
+                <button type="button" key={g.id} onClick={() => pick(g)} className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-surface-container-low">
+                  <span className="font-medium text-on-surface">{g.name}</span>
+                  <span className="text-on-surface-variant">{g.phone}</span>
                 </button>
               ))}
             </div>

@@ -7,17 +7,16 @@ import { useAppearance } from '../context/AppearanceContext';
 import { useData } from '../context/DataContext';
 import { Icon } from '../components/icons';
 import Dashboard from './Dashboard';
-import { Closing, Features, Gallery, Hero, HowItWorks, NightBand, Pillars, useHotelLook } from './Welcome';
+import { Closing, Features, Hero, HowItWorks, NightBand, Pillars } from './Welcome';
 import { ripple } from '../motion/hotel';
 import './welcome.css';
 
-const SECTIONS = [['today', 'Front desk', 'concierge'], ['features', 'Features', 'auto_awesome'], ['how', 'How it works', 'route'], ['gallery', 'Gallery', 'photo_library']];
+const SECTIONS = [['today', 'Front desk', 'concierge'], ['features', 'Features', 'auto_awesome'], ['how', 'How it works', 'route']];
 
 export default function Home() {
   const nav = useNavigate();
   const { motion: level } = useAppearance();
   const { settings, can } = useData();
-  const { photos } = useHotelLook(settings.hotelName || 'StayBill');
   const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: level === 'off' ? 'auto' : 'smooth', block: 'start' });
   const newBill = { label: 'Create a new bill', icon: 'receipt_long', onClick: () => nav('/bills/new') };
 
@@ -52,9 +51,8 @@ export default function Home() {
           </button>
         )} />
         <Pillars />
-        <Gallery photos={photos} hint={can.settings ? 'Add real photos of your hotel in Settings → Gallery.' : undefined} />
         <Closing action={newBill} hotel={settings.hotelName}
-          links={[['Front desk', () => go('today')], ['Features', () => go('features')], ['How it works', () => go('how')], ['Gallery', () => go('gallery')]]} />
+          links={[['Front desk', () => go('today')], ['Features', () => go('features')], ['How it works', () => go('how')]]} />
       </NightBand>
     </div>
   );

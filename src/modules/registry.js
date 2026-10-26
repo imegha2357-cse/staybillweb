@@ -6,7 +6,6 @@ export const GROUPS = [
   { id: 'front', label: 'Front desk', icon: 'concierge' },
   { id: 'fnb', label: 'Restaurant', icon: 'restaurant' },
   { id: 'ops', label: 'Operations', icon: 'cleaning_services' },
-  { id: 'stock', label: 'Stock', icon: 'inventory_2' },
   { id: 'team', label: 'Team', icon: 'badge' },
   { id: 'guests', label: 'Guests', icon: 'favorite' },
   { id: 'finance', label: 'Finance', icon: 'account_balance' },
@@ -32,10 +31,10 @@ export const MODULES = [
   { id: 'maintenance', group: 'ops', label: 'Maintenance', icon: 'build', path: '/maintenance', staff: true, desc: 'Repair tickets per room, out-of-order rooms and the preventive schedule.' },
   { id: 'lostfound', group: 'ops', label: 'Lost & found', icon: 'search_check', path: '/lost-found', staff: true, desc: 'Items found in rooms and who they were returned to.' },
   { id: 'assets', group: 'ops', label: 'Assets', icon: 'chair', path: '/assets', staff: false, desc: 'Asset register with locations, costs and warranty dates.' },
-  // Stock
-  { id: 'inventory', group: 'stock', label: 'Inventory', icon: 'inventory_2', path: '/inventory', staff: true, desc: 'Stock items, issues, wastage, minibar, low-stock alerts and stock-taking.' },
-  { id: 'purchases', group: 'stock', label: 'Purchases', icon: 'shopping_cart', path: '/purchases', staff: true, desc: 'Purchase requests and orders, owner approval, goods received and supplier invoices.' },
-  { id: 'suppliers', group: 'stock', label: 'Suppliers', icon: 'local_shipping', path: '/suppliers', staff: false, desc: 'Supplier directory, payables, payments and price history.' },
+  // Stock (shown under Operations)
+  { id: 'inventory', group: 'ops', label: 'Inventory', icon: 'inventory_2', path: '/inventory', staff: true, desc: 'Stock items, issues, wastage, minibar, low-stock alerts and stock-taking.' },
+  { id: 'purchases', group: 'ops', label: 'Purchases', icon: 'shopping_cart', path: '/purchases', staff: true, desc: 'Purchase requests and orders, owner approval, goods received and supplier invoices.' },
+  { id: 'suppliers', group: 'ops', label: 'Suppliers', icon: 'local_shipping', path: '/suppliers', staff: false, desc: 'Supplier directory, payables, payments and price history.' },
   // Team
   { id: 'attendance', group: 'team', label: 'Attendance', icon: 'schedule', path: '/attendance', staff: true, desc: 'Clock in and out, daily register, late and absent report.' },
   { id: 'shifts', group: 'team', label: 'Shifts & leave', icon: 'calendar_month', path: '/shifts', staff: true, desc: 'Weekly roster, leave requests and approvals.' },

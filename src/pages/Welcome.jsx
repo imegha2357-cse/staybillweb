@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useScroll, useTransform, useMotionValueEvent } from 'framer-motion';
 import Lenis from 'lenis';
 import { KeyCardTap, PoolLight } from '../motion/hotel';
-import { listGallery } from '../lib/db';
 import { useAppearance } from '../context/AppearanceContext';
 import { CountUp, CursorGlow, PauseMotionButton, Reveal, Starfield, EASE } from '../motion';
 import { Icon } from '../components/icons';
@@ -204,14 +203,8 @@ export function HowItWorks({ motionLevel, stickyTop = 0, cta }) {
 
 // ---------- Shared data loaders ----------
 export function useHotelLook(given) {
-  const [hotel] = useState(given || '');
-  const [photos, setPhotos] = useState([]);
-  useEffect(() => {
-    // Signed-out visitors see the generic StayBill page; a hotel's own name and photos show once someone signs in.
-    if (!given) return;
-    listGallery().then((list) => setPhotos([...list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)))).catch(() => {});
-  }, [given]);
-  return { hotel: given || hotel, photos };
+  // Signed-out visitors see the generic StayBill page; a hotel's own name shows once someone signs in.
+  return { hotel: given || '' };
 }
 
 /** Dark night-sky band. `clip` keeps rounded corners without breaking sticky sections. */
@@ -409,7 +402,7 @@ export function Closing({ action, hotel, links }) {
 export default function Welcome({ onEnter, ctaLabel = 'Sign in' }) {
   const { motion: level } = useAppearance();
   const off = level === 'off';
-  const { hotel, photos } = useHotelLook();
+  const { hotel } = useHotelLook();
 
   useEffect(() => {
     if (off) return undefined;
@@ -436,7 +429,7 @@ export default function Welcome({ onEnter, ctaLabel = 'Sign in' }) {
             <span className="hidden text-sm text-w-mist3 sm:inline">{hotel}</span>
           </button>
           <nav className="hidden items-center gap-1 text-sm text-w-mist md:flex">
-            {[['features', 'Features'], ['how', 'How it works'], ['gallery', 'Gallery'], ['contact', 'Get started']].map(([id, l]) => (
+            {[['features', 'Features'], ['how', 'How it works'], ['contact', 'Get started']].map(([id, l]) => (
               <button key={id} type="button" onClick={() => go(id)} className="rounded-lg px-3 py-1.5 transition-colors hover:bg-white/10 hover:text-white">{l}</button>
             ))}
           </nav>
@@ -449,8 +442,7 @@ export default function Welcome({ onEnter, ctaLabel = 'Sign in' }) {
       <Features cta={<button type="button" onClick={onEnter} className="wl-btn flex shrink-0 items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold text-white">{ctaLabel} <Icon name="arrow_forward" size={14} /></button>} />
       <HowItWorks motionLevel={level} />
       <Pillars />
-      <Gallery photos={photos} />
-      <Closing action={enter} hotel={hotel} links={[['Features', () => go('features')], ['How it works', () => go('how')], ['Gallery', () => go('gallery')]]} />
+      <Closing action={enter} hotel={hotel} links={[['Features', () => go('features')], ['How it works', () => go('how')]]} />
     </NightBand>
   );
 }

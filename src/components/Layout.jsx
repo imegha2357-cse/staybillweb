@@ -122,8 +122,45 @@ function AccountMenu({ onPassword }) {
 
 
 /** One menu-bar entry: a direct link, or a group that opens a dropdown of modules. */
+/** Search button in the top bar; the field opens on demand so the menu keeps its room. */
+function HeaderSearch({ q, setQ, onSearch }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    const esc = (e) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', close); document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
+  }, [open]);
+  return (
+    <div ref={ref} className="relative hidden lg:block">
+      <button type="button" onClick={() => setOpen(!open)} title="Search bills, rooms, guests" aria-label="Search" aria-expanded={open}
+        className={cx('rounded-lg p-space-sm transition-colors', open ? 'bg-surface-container-low text-on-surface' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface')}>
+        <Icon name="search" size={20} />
+      </button>
+      {open && (
+        <form onSubmit={(e) => { onSearch(e); setOpen(false); }} className="absolute right-0 top-full z-50 mt-2 flex w-80 items-center gap-2 rounded-xl bg-surface-container-lowest p-2 shadow-xl ring-1 ring-outline-variant/30">
+          <Icon name="search" size={16} className="ml-1 text-outline" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} type="search" aria-label="Search bills" placeholder="Invoice no., guest, phone or room…" autoFocus
+            className="hm-search min-w-0 flex-1 bg-transparent py-1.5 text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none" />
+          <button type="submit" className="rounded-lg bg-primary px-3 py-1.5 text-label-md text-on-primary">Search</button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function NavGroup({ group, items, loc, active, mobile, onPick }) {
   const [open, setOpen] = useState(false);
+  const [side, setSide] = useState('center');
+  // Open the panel towards the middle of the screen so it never runs off an edge.
+  const place = () => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const mid = (r.left + r.right) / 2; const w = window.innerWidth;
+    setSide(mid < 300 ? 'left' : mid > w - 300 ? 'right' : 'center');
+  };
   const ref = useRef();
   const timer = useRef();
   useEffect(() => {
@@ -150,16 +187,17 @@ function NavGroup({ group, items, loc, active, mobile, onPick }) {
     );
   }
   return (
-    <div className="relative" ref={ref} onMouseEnter={() => { clearTimeout(timer.current); setOpen(true); }} onMouseLeave={() => { timer.current = setTimeout(() => setOpen(false), 160); }}>
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="true"
+    <div className="relative" ref={ref} onMouseEnter={() => { clearTimeout(timer.current); place(); setOpen(true); }} onMouseLeave={() => { timer.current = setTimeout(() => setOpen(false), 160); }}>
+      <button type="button" onClick={() => { place(); setOpen(!open); }} aria-expanded={open} aria-haspopup="true"
         className={cx('flex items-center gap-0.5 whitespace-nowrap rounded-full px-2 py-1.5 text-label-lg transition-colors 2xl:px-2.5',
           active ? 'bg-primary-container text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface')}>
         <Icon name={group.icon} size={17} className="hidden 2xl:inline" /><span>{group.label}</span><Icon name="expand_more" size={15} className={cx('transition-transform', open && 'rotate-180')} />
       </button>
       <AnimatePresence>
         {open && (
-          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }}
-            className="absolute left-1/2 top-full z-50 mt-2 w-[min(560px,92vw)] -translate-x-1/2 rounded-2xl bg-surface-container-lowest p-space-sm shadow-xl ring-1 ring-outline-variant/30">
+          <motion.div initial={{ opacity: 0, y: -6, x: side === 'center' ? '-50%' : 0 }} animate={{ opacity: 1, y: 0, x: side === 'center' ? '-50%' : 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }}
+            className={cx('absolute top-full z-50 mt-2 w-[min(560px,92vw)] rounded-2xl', side === 'left' ? 'left-0' : side === 'right' ? 'right-0' : 'left-1/2')}>
+            <div className="rounded-2xl bg-surface-container-lowest p-space-sm shadow-xl ring-1 ring-outline-variant/30">
             <div className="grid gap-1 sm:grid-cols-2">
               {items.map((it) => (
                 <NavLink key={it.id} to={it.path} end={it.end}
@@ -171,6 +209,7 @@ function NavGroup({ group, items, loc, active, mobile, onPick }) {
                   </span>
                 </NavLink>
               ))}
+            </div>
             </div>
           </motion.div>
         )}
@@ -244,15 +283,9 @@ export default function Layout() {
             ))}
           </nav>
           <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-space-sm lg:ml-0">
+            {inHotel && <HeaderSearch q={q} setQ={setQ} onSearch={onSearch} />}
             {inHotel && (
-              <form onSubmit={onSearch} className="relative hidden items-center 2xl:flex">
-                <Icon name="search" size={16} className="pointer-events-none absolute left-3 text-outline" />
-                <input value={q} onChange={(e) => setQ(e.target.value)} type="search" aria-label="Search bills" placeholder="Search bills, rooms, guests…"
-                  className="hm-search w-56 rounded-full bg-surface-container-low py-1.5 pl-9 pr-3 text-body-sm text-on-surface placeholder:text-on-surface-variant focus:bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-secondary" />
-              </form>
-            )}
-            {inHotel && (
-              <Link to="/bills/new" onPointerDown={ripple} className="relative isolate hidden items-center gap-space-xs overflow-hidden rounded-full bg-primary px-space-md py-1.5 text-label-lg text-on-primary shadow-sm transition-colors hover:bg-primary-container sm:inline-flex lg:hidden 2xl:inline-flex">
+              <Link to="/bills/new" onPointerDown={ripple} className="relative isolate hidden items-center gap-space-xs overflow-hidden rounded-full bg-primary px-space-md py-1.5 text-label-lg text-on-primary shadow-sm transition-colors hover:bg-primary-container sm:inline-flex lg:hidden xl:inline-flex">
                 <Icon name="add" size={16} />New Bill
               </Link>
             )}

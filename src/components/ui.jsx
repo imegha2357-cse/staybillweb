@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 // Shared UI primitives, styled after the Google Stitch design system:
 // borderless white cards with soft shadows, brand-coloured primary actions and
 // accents (see src/lib/palettes.js), Plus Jakarta Sans headings, Material Symbols.
@@ -173,9 +174,11 @@ export function Modal({ open, onClose, title, icon, children, footer, wide }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
   if (!open) return null;
-  return (
+  // Rendered at the end of <body>: a moving page (transitions use transforms) would
+  // otherwise trap a fixed overlay inside the page and cut the window off.
+  return createPortal(
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18 }}
-      className="no-print fixed inset-0 z-[60] flex items-end justify-center bg-inverse-surface/40 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
+      className="no-print fixed inset-0 z-[60] flex items-end justify-center bg-black/45 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
       <motion.div initial={{ opacity: 0, y: 18, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
         role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}
         className={cx('max-h-[92vh] w-full overflow-y-auto rounded-t-xl bg-surface-container-lowest shadow-xl sm:rounded-xl', wide ? 'sm:max-w-2xl' : 'sm:max-w-lg')}>
@@ -189,7 +192,8 @@ export function Modal({ open, onClose, title, icon, children, footer, wide }) {
         <div className="px-space-lg py-space-sm">{children}</div>
         {footer && <div className="sticky bottom-0 flex justify-end gap-space-sm bg-surface-container-lowest px-space-lg pb-space-lg pt-space-md">{footer}</div>}
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body,
   );
 }
 

@@ -10,7 +10,6 @@ import { useData } from '../context/DataContext';
 import {
   saveSettings, saveInvoiceSettings, getCounter, createTax, updateTax, deleteTax,
   listUsers, createAccount, updateAccount, usernameProblem, passwordProblem, recentMail, listAudit, exportBackup, restoreBackup,
-  listGallery, addGalleryPhoto, updateGalleryCaption, deleteGalleryPhoto,
 } from '../lib/db';
 import { fmtDateTime } from '../lib/format';
 import { formatInvoiceNumber } from '../lib/billing';
@@ -23,7 +22,7 @@ import { Badge, Button, IconButton, Card, Field, Input, Loading, Modal, PageHead
 
 const TABS = [
   { id: 'hotel', label: 'Hotel' }, { id: 'invoice', label: 'Invoice' }, { id: 'taxes', label: 'Taxes' },
-  { id: 'modules', label: 'Modules' }, { id: 'users', label: 'Staff logins' }, { id: 'permissions', label: 'Permissions' }, { id: 'email', label: 'Guest emails' }, { id: 'audit', label: 'Audit Log' }, { id: 'backup', label: 'Backup' }, { id: 'welcome', label: 'Gallery' }, { id: 'plan', label: 'Subscription' },
+  { id: 'modules', label: 'Modules' }, { id: 'users', label: 'Staff logins' }, { id: 'permissions', label: 'Permissions' }, { id: 'email', label: 'Guest emails' }, { id: 'audit', label: 'Audit Log' }, { id: 'backup', label: 'Backup' }, { id: 'plan', label: 'Subscription' },
 ];
 
 export default function Settings() {
@@ -41,7 +40,6 @@ export default function Settings() {
       {tab === 'permissions' && <Permissions />}
       {tab === 'audit' && <AuditLog />}
       {tab === 'backup' && <Backup />}
-      {tab === 'welcome' && <WelcomeSettings />}
       {tab === 'plan' && <SubscriptionCard />}
     </div>
   );
@@ -640,81 +638,3 @@ function resizePhoto(file, max = 1280) {
   });
 }
 
-function WelcomeSettings() {
-  const { user } = useAuth();
-  const toast = useToast();
-  const confirm = useConfirm();
-  const [photos, setPhotos] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const fileRef = useRef();
-  const load = () => listGallery().then(setPhotos).catch((e) => { toast(errMsg(e), 'error'); setPhotos([]); });
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function onFiles(e) {
-    const files = [...(e.target.files || [])].slice(0, Math.max(0, 12 - (photos?.length || 0)));
-    e.target.value = '';
-    if (!files.length) { toast('The gallery holds up to 12 photos.', 'error'); return; }
-    setBusy(true);
-    try {
-      let order = (photos || []).reduce((m, p) => Math.max(m, p.order ?? 0), 0);
-      for (const f of files) {
-        // eslint-disable-next-line no-await-in-loop
-        const image = await resizePhoto(f);
-        order += 1;
-        // eslint-disable-next-line no-await-in-loop
-        await addGalleryPhoto(user, { image, caption: f.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '), order });
-      }
-      toast(`${files.length} photo${files.length === 1 ? '' : 's'} added`);
-      await load();
-    } catch (err) { toast(errMsg(err), 'error'); }
-    setBusy(false);
-  }
-  async function remove(p) {
-    if (!(await confirm(`Remove "${p.caption || 'this photo'}" from the gallery?`, { title: 'Remove photo', confirmLabel: 'Remove' }))) return;
-    try { await deleteGalleryPhoto(user, p.id); toast('Photo removed'); load(); } catch (e) { toast(errMsg(e), 'error'); }
-  }
-  async function saveCaption(p, caption) {
-    if ((p.caption || '') === caption.trim()) return;
-    try { await updateGalleryCaption(user, p.id, caption); toast('Caption saved'); } catch (e) { toast(errMsg(e), 'error'); }
-  }
-
-  return (
-    <div className="grid items-start gap-space-md lg:grid-cols-[1fr_320px]">
-      <Card className="p-4 sm:p-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 className="font-headline text-headline-sm text-on-surface">Photo gallery</h3>
-            <p className="text-body-md text-on-surface-variant">Photos of your hotel for the gallery on the home page. Up to 12; the first 8 are shown.</p>
-          </div>
-          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" multiple className="hidden" onChange={onFiles} />
-          <Button icon="add_photo_alternate" loading={busy} onClick={() => fileRef.current.click()} disabled={(photos?.length || 0) >= 12}>Add photos</Button>
-        </div>
-        {!photos ? <Loading /> : photos.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-outline-variant p-8 text-center text-body-md text-on-surface-variant">
-            No photos yet. The home page gallery shows illustrated placeholders until you add some.
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {photos.map((p) => (
-              <div key={p.id} className="overflow-hidden rounded-xl bg-surface-container-low">
-                <div className="relative aspect-[4/3]">
-                  <img src={p.image} alt={p.caption || 'Hotel photo'} className="h-full w-full object-cover" />
-                  <button type="button" onClick={() => remove(p)} aria-label="Remove photo"
-                    className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-error"><Trash2 className="h-4 w-4" /></button>
-                </div>
-                <input defaultValue={p.caption || ''} onBlur={(e) => saveCaption(p, e.target.value)} placeholder="Caption"
-                  className="w-full bg-transparent px-3 py-2 text-label-md text-on-surface focus:outline-none" aria-label="Photo caption" />
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-      <Card className="space-y-2 p-space-md text-body-md text-on-surface-variant">
-        <h3 className="font-headline text-headline-sm text-on-surface">Where these photos appear</h3>
-        <p>The gallery is part of the home page, below the live front desk, alongside the night-city hero, features and how a bill is made.</p>
-        <p>Staff can choose the theme and animation level for their device from the <b>Appearance</b> menu (palette icon in the top bar).</p>
-        <Link to="/" className="inline-flex items-center gap-1 font-medium text-secondary hover:underline">Open the home page<Icon name="arrow_forward" size={14} /></Link>
-      </Card>
-    </div>
-  );
-}

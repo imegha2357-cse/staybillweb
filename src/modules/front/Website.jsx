@@ -8,7 +8,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from '../../backend/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
-import { listGallery, saveSettings } from '../../lib/db';
+import { saveSettings } from '../../lib/db';
 import { addDays } from '../../lib/dates';
 import { Button, Field, Input, Textarea, Toggle, cx, useToast, errMsg } from '../../components/ui';
 import { Chip, DataTable, ModulePage, Panel, Stats, fmtDate, money, num, today, useLive } from '../kit';
@@ -37,7 +37,6 @@ export function soldOutDates({ rooms, roomTypes, bills, bookings }) {
 }
 
 export async function publishProfile({ hotelId, settings, roomTypes, rooms, bills, bookings, site }) {
-  const gallery = await listGallery().catch(() => []);
   const types = roomTypes.filter((rt) => site.types?.[rt.name]?.show !== false && rooms.some((r) => r.roomType === rt.name)).map((rt) => {
     const o = site.types?.[rt.name] || {};
     return { name: rt.name, rate: num(o.rate) || num(rt.defaultRate), capacity: num(o.capacity) || 2, description: o.description || '', image: o.image || '' };
@@ -46,7 +45,7 @@ export async function publishProfile({ hotelId, settings, roomTypes, rooms, bill
     hotelId, open: !!site.open, name: settings.hotelName || '', city: settings.city || '', address: settings.address || '', phone: settings.phone || '', email: settings.email || '',
     logo: settings.logo || '', currency: settings.currency || 'INR', intro: site.intro || '', policies: site.policies || '', amenities: site.amenities || [],
     checkInTime: site.checkInTime || '12:00', checkOutTime: site.checkOutTime || '11:00', taxNote: site.taxNote || 'Taxes extra as applicable',
-    photos: gallery.slice(0, 6).map((g) => ({ image: g.image, caption: g.caption || '' })), roomTypes: types,
+    photos: [], roomTypes: types,
     soldOut: soldOutDates({ rooms, roomTypes, bills, bookings }), updatedAt: serverTimestamp(),
   });
 }
@@ -106,7 +105,7 @@ export default function Website() {
               </div>
             </div>
           </div>
-          <p className="mt-3 text-label-md text-on-surface-variant">Photos come from Settings → Gallery. Click “Update page” after changes; rates and sold-out dates are copied to the page then.</p>
+          <p className="mt-3 text-label-md text-on-surface-variant">Click “Update page” after changes; rates and sold-out dates are copied to the page then.</p>
         </Panel>
         <Panel title="Room types on the page" icon="meeting_room">
           {roomTypes.length === 0 ? <p className="text-body-md text-on-surface-variant">Add room types and rooms first.</p> : roomTypes.map((rt) => {

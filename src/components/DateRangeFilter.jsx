@@ -10,7 +10,7 @@ export default function DateRangeFilter({ value, onChange }) {
         {RANGE_PRESETS.map((p) => (
           <button key={p.id} type="button"
             onClick={() => onChange(p.id === 'custom' ? { preset: 'custom', from, to } : { preset: p.id, ...presetRange(p.id) })}
-            className={cx('rounded-md px-2.5 py-1 text-sm font-medium', preset === p.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800')}>
+            className={cx('rounded-md px-2.5 py-1 text-sm font-medium', preset === p.id ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-slate-500 hover:text-slate-800')}>
             {p.label}
           </button>
         ))}
