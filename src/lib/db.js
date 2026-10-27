@@ -112,9 +112,18 @@ export async function getHotel(hid) {
   return s.exists() ? { id: s.id, ...s.data() } : null;
 }
 /** Adds a hotel with default settings, and (optionally) its owner's login. */
+
+/** A save that Google never confirms (no database, wrong database type, offline) would wait
+ * forever; after 20 s say so instead of spinning. The change stays queued on this device. */
+export const SAVE_TIMEOUT_MSG = 'Could not reach the database. Check your internet connection. If it keeps happening, the Firestore database for this project may be missing or of the wrong type (it must be Standard edition, Native mode, named "(default)").';
+export function confirmed(p, ms = 20000) {
+  if (isLocalBackend) return p;
+  let t;
+  return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(SAVE_TIMEOUT_MSG)), ms); })]).finally(() => clearTimeout(t));
+}
 export async function createHotel(admin, { hotelName, city = '', owner }) {
   const ref = doc(collection(db, 'hotels'));
-  await setDoc(ref, { name: hotelName, city, status: 'active', createdAt: serverTimestamp(), createdBy: actor(admin) });
+  await confirmed(setDoc(ref, { name: hotelName, city, status: 'active', createdAt: serverTimestamp(), createdBy: actor(admin) }));
   await seedHotelData(ref.id, hotelName, admin, { city });
   if (owner?.username) await createAccount(admin, { ...owner, role: 'owner', hotelId: ref.id });
   return ref.id;
@@ -161,17 +170,23 @@ export async function createAccount(by, { name, username, password, role, hotelI
     const sAuth = getAuth(secondary);
     let cred;
     try {
-      cred = await createUserWithEmailAndPassword(sAuth, loginEmail(uname), password);
+      cred = await confirmed(createUserWithEmailAndPassword(sAuth, loginEmail(uname), password));
     } catch (e) {
       if (e?.code === 'auth/email-already-in-use') throw new Error(`The username "${uname}" is already taken. Choose another.`);
       throw e;
     }
     // The profile must exist before anything else; the rest runs side by side
     // (one round trip to Google instead of five).
-    await setDoc(doc(db, 'users', cred.user.uid), {
-      name: name.trim(), username: uname, role, hotelId: hotelId || null, phone, status: 'active',
-      createdAt: serverTimestamp(), createdBy: actor(by),
-    });
+    try {
+      await confirmed(setDoc(doc(db, 'users', cred.user.uid), {
+        name: name.trim(), username: uname, role, hotelId: hotelId || null, phone, status: 'active',
+        createdAt: serverTimestamp(), createdBy: actor(by),
+      }));
+    } catch (e) {
+      // Without a profile the login is useless; remove it so the username can be used again.
+      await cred.user.delete?.().catch(() => {});
+      throw e;
+    }
     await Promise.all([
       signOut(sAuth).catch(() => {}),
       role === 'owner' && hotelId
