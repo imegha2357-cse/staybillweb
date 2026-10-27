@@ -7,6 +7,9 @@ import { DEFAULT_SETTINGS } from '../lib/db';
 import { setCurrency } from '../lib/format';
 import { applyBrand, DEFAULT_BRAND } from '../lib/palettes';
 import { useAuth } from './AuthContext';
+import { repairHotelSetup } from '../lib/db';
+
+const repaired = new Set();
 import { moduleAccess } from '../modules/registry';
 
 const DataCtx = createContext(null);
@@ -35,6 +38,11 @@ export function DataProvider({ children }) {
     const once = (fn) => { let called = false; return (...a) => { fn(...a); if (!called) { called = true; done(); } }; };
     const unsubs = [
       onSnapshot(hdoc('settings', 'hotel', hotelId), once((s) => {
+        // A hotel whose setup never reached the database: fill in the defaults (managers only).
+        if (!s.exists() && !s.metadata?.fromCache && (isAdmin || role === 'owner') && !repaired.has(hotelId)) {
+          repaired.add(hotelId);
+          repairHotelSetup(user, hotelId).catch((e) => console.warn('Hotel setup repair failed', e));
+        }
         const data = { ...DEFAULT_SETTINGS, ...(s.data() || {}) };
         data.permissions = { ...DEFAULT_SETTINGS.permissions, ...(data.permissions || {}) };
         setCurrency(data.currency);

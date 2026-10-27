@@ -9,7 +9,7 @@ import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Ta
 import { KeyRack, RoomTile } from '../motion/hotel';
 import { useOccupancy } from '../lib/useOccupancy';
 
-function RoomModal({ open, onClose, room }) {
+function RoomModal({ open, onClose, room, onNeedTypes }) {
   const { user, hotel } = useAuth();
   const { roomTypes, activeTaxes, rooms } = useData();
   const toast = useToast();
@@ -58,8 +58,12 @@ function RoomModal({ open, onClose, room }) {
           <Field label="Room number" required error={err.roomNumber}><Input value={f.roomNumber || ''} onChange={(e) => setF({ ...f, roomNumber: e.target.value })} autoFocus invalid={!!err.roomNumber} /></Field>
           <Field label="Room type" required error={err.roomType}>
             <Select value={f.roomType || ''} onChange={(e) => onType(e.target.value)}>
+              {!f.roomType && <option value="">{roomTypes.length ? 'Choose a type' : 'No room types yet'}</option>}
               {roomTypes.map((t) => <option key={t.id}>{t.name}</option>)}
             </Select>
+            {roomTypes.length === 0 && onNeedTypes && (
+              <button type="button" onClick={onNeedTypes} className="mt-1 text-label-md font-medium text-secondary hover:underline">Add room types first →</button>
+            )}
           </Field>
           <Field label={`Standard rate (${currencySymbol()}/night)`} required error={err.rate}><Input type="number" min="0" step="0.01" value={f.rate ?? ''} onChange={(e) => setF({ ...f, rate: e.target.value })} invalid={!!err.rate} /></Field>
           <Field label="Status">
@@ -208,7 +212,7 @@ export default function Rooms() {
           )}
         </Card>
       )}
-      <RoomModal open={!!modal} room={modal?.room} onClose={() => { setModal(null); if (params.get('new')) setParams({}); }} />
+      <RoomModal open={!!modal} room={modal?.room} onClose={() => { setModal(null); if (params.get('new')) setParams({}); }} onNeedTypes={() => { setModal(null); setTab('types'); }} />
     </div>
   );
 }

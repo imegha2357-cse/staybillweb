@@ -102,6 +102,33 @@ async function seedHotelData(hid, hotelName, by, extra = {}) {
   await b.commit();
 }
 
+/**
+ * Fills in whatever a hotel's setup is missing (settings, invoice counter, taxes, room types).
+ * Needed when a hotel was created but its setup never reached the database. Never overwrites.
+ */
+export async function repairHotelSetup(by, hid) {
+  const [settings, counter, taxes, types, hotel] = await Promise.all([
+    getDoc(hdoc('settings', 'hotel', hid)), getDoc(hdoc('counters', 'invoice', hid)),
+    getDocs(hcol('taxes', hid)), getDocs(hcol('roomTypes', hid)), getDoc(doc(db, 'hotels', hid)),
+  ]);
+  const h = hotel.exists() ? hotel.data() : {};
+  const b = writeBatch(db); let n = 0;
+  if (!settings.exists()) { b.set(hdoc('settings', 'hotel', hid), { ...DEFAULT_SETTINGS, hotelName: h.name || '', city: h.city || '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() }); n += 1; }
+  if (!counter.exists()) { b.set(hdoc('counters', 'invoice', hid), { next: DEFAULT_SETTINGS.invoiceStartNumber }); n += 1; }
+  if (taxes.empty) {
+    ['CGST', 'SGST'].forEach((name) => b.set(doc(hcol('taxes', hid)), { name, rate: 2.5, status: 'active', createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+    n += 1;
+  }
+  if (types.empty) {
+    const rates = { Standard: 1500, Deluxe: 2500, Premium: 3200, Suite: 4000, 'Family Room': 3500 };
+    DEFAULT_ROOM_TYPES.forEach((t, i) => b.set(doc(hcol('roomTypes', hid)), { name: t, defaultRate: rates[t], order: i, createdAt: serverTimestamp() }));
+    n += 1;
+  }
+  if (!n) return false;
+  await confirmed(b.commit());
+  return true;
+}
+
 // ---------- Hotels (administrator) ----------
 export async function listHotels() {
   const snap = await getDocs(collection(db, 'hotels'));
@@ -124,7 +151,7 @@ export function confirmed(p, ms = 20000) {
 export async function createHotel(admin, { hotelName, city = '', owner }) {
   const ref = doc(collection(db, 'hotels'));
   await confirmed(setDoc(ref, { name: hotelName, city, status: 'active', createdAt: serverTimestamp(), createdBy: actor(admin) }));
-  await seedHotelData(ref.id, hotelName, admin, { city });
+  await confirmed(seedHotelData(ref.id, hotelName, admin, { city }));
   if (owner?.username) await createAccount(admin, { ...owner, role: 'owner', hotelId: ref.id });
   return ref.id;
 }
