@@ -33,7 +33,10 @@ const stamp = (user) => ({ createdAt: serverTimestamp(), updatedAt: serverTimest
 async function numbers(counter, prefix, n = N, pad = 4) {
   const ref = hdoc('counters', counter);
   const snap = await getDocs(hcol('counters'));
-  const cur = snap.docs.find((d) => d.id === counter)?.data()?.next || 1;
+  const existing = snap.docs.find((d) => d.id === counter);
+  const cur = existing?.data()?.next || 1;
+  // security rules: a new counter must start at 2; after that the owner may move it on
+  if (!existing) await setDoc(ref, { next: 2 });
   await setDoc(ref, { next: cur + n });
   return range(n).map((i) => `${prefix}-${String(cur + i).padStart(pad, '0')}`);
 }
