@@ -266,7 +266,7 @@ export default function AdminHome({ tab: initialTab = 'hotels' }) {
             <Table head={['Hotel', 'Owner login', 'Employees', { label: 'This month', right: true }, { label: 'To collect', right: true }, 'Status', '']}>
               {filtered.map((h) => {
                 const m = stats[h.id];
-                const owner = people.find((p) => p.id === h.ownerUid);
+                const owner = people.find((p) => p.id === h.ownerUid) || people.find((p) => p.role === 'owner' && p.hotelId === h.id && p.status !== 'inactive');
                 return (
                   <tr key={h.id} className="h-16 hover:bg-surface-container-low/60">
                     <Td><div className="font-semibold">{h.name}</div><div className="text-label-sm text-on-surface-variant">{h.city || '—'}{h.importedFromEarlierVersion ? ' · imported' : ''}</div></Td>
