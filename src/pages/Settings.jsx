@@ -23,7 +23,7 @@ import { Badge, Button, IconButton, Card, Field, Input, Loading, Modal, PageHead
 
 const TABS = [
   { id: 'hotel', label: 'Hotel' }, { id: 'invoice', label: 'Invoice' }, { id: 'taxes', label: 'Taxes' },
-  { id: 'modules', label: 'Modules' }, { id: 'users', label: 'Staff logins' }, { id: 'permissions', label: 'Permissions' }, { id: 'email', label: 'Guest emails' }, { id: 'whatsapp', label: 'WhatsApp' }, { id: 'audit', label: 'Audit Log' }, { id: 'backup', label: 'Backup' }, { id: 'plan', label: 'Subscription' },
+  { id: 'modules', label: 'Modules' }, { id: 'users', label: 'Staff logins' }, { id: 'permissions', label: 'Permissions' }, { id: 'email', label: 'Guest emails' }, { id: 'whatsapp', label: 'WhatsApp' }, { id: 'audit', label: 'Audit Log' }, { id: 'backup', label: 'Backup' }, { id: 'demo', label: 'Demo data' }, { id: 'plan', label: 'Subscription' },
 ];
 
 export default function Settings() {
@@ -42,6 +42,7 @@ export default function Settings() {
       {tab === 'permissions' && <Permissions />}
       {tab === 'audit' && <AuditLog />}
       {tab === 'backup' && <Backup />}
+      {tab === 'demo' && <DemoData />}
       {tab === 'plan' && <SubscriptionCard />}
     </div>
   );
@@ -640,3 +641,41 @@ function resizePhoto(file, max = 1280) {
   });
 }
 
+
+function DemoData() {
+  const { user } = useAuth();
+  const { settings } = useData();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [busy, setBusy] = useState(false);
+  const [log, setLog] = useState([]);
+  const [error, setError] = useState('');
+  async function run() {
+    const again = settings.demoLoadedAt ? ` Demo data was already added on ${fmtDateTime(settings.demoLoadedAt)}; running it again adds another set.` : '';
+    if (!(await confirm(`Add 15 sample entries to every list of ${settings.hotelName || 'this hotel'}: guests, bills and payments, bookings, restaurant, stock, suppliers, purchases, housekeeping, maintenance, lost & found, assets, staff, attendance, shifts, leave, advances, feedback, campaigns, loyalty, expenses and credit notes?${again}`, { title: 'Add demo data', confirmLabel: 'Add demo data' }))) return;
+    setBusy(true); setLog([]); setError('');
+    try {
+      const { loadDemoData } = await import('../lib/demoData');
+      await loadDemoData(user, settings, (line) => setLog((l) => [...l, line]));
+      toast('Demo data added');
+    } catch (e) { setError(errMsg(e)); toast(errMsg(e), 'error'); }
+    setBusy(false);
+  }
+  return (
+    <Card className="p-5">
+      <h3 className="font-headline text-headline-sm">Demo data</h3>
+      <p className="mt-1 max-w-2xl text-body-md text-on-surface-variant">
+        Fills this hotel with realistic sample entries (15 in each list) so you can try every screen: rooms, guests, bills with payments, bookings, menu and orders, stock, suppliers and purchase orders, housekeeping, maintenance, lost &amp; found, assets, staff, attendance, shifts, leave, salary advances, feedback, campaigns, loyalty points, expenses and credit notes.
+        Sample guests use example.com email addresses, and no emails or WhatsApp messages are sent. Nothing you already entered is changed.
+      </p>
+      <Button className="mt-4" icon="auto_awesome" loading={busy} onClick={run}>Add demo data</Button>
+      {(log.length > 0 || busy) && (
+        <ul className="mt-4 grid gap-1 text-body-md sm:grid-cols-2 lg:grid-cols-3">
+          {log.map((l) => <li key={l} className="flex items-center gap-2"><Icon name="check_circle" size={16} className="text-on-ok-container" />{l}</li>)}
+          {busy && <li className="flex items-center gap-2 text-on-surface-variant"><Icon name="progress_activity" size={16} className="animate-spin" />Working…</li>}
+        </ul>
+      )}
+      {error && <p className="mt-3 text-body-md text-error">Stopped: {error}. Entries added before this point were kept.</p>}
+    </Card>
+  );
+}

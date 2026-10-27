@@ -530,7 +530,7 @@ async function createBillCore(user, form, computed, initialPayment) {
       guestId,
       invoiceNumber,
       invoiceSeq: seq,
-      billDate: today(),
+      billDate: form.billDate || today(),
       paidAmount: pay,
       balanceAmount: round2(Math.max(computed.grandTotal - pay, 0)),
       paymentStatus: status,
@@ -662,7 +662,7 @@ function paymentDoc(user, bill, p, amount) {
     method: p.method,
     referenceNumber: (p.referenceNumber || '').trim(),
     notes: (p.notes || '').trim(),
-    date: today(),
+    date: p.date || today(),
     receivedBy: actor(user),
     createdAt: serverTimestamp(),
   };
@@ -708,8 +708,9 @@ async function hotelSettings() {
   const s = await getDoc(hdoc('settings', 'hotel'));
   return s.exists() ? { ...DEFAULT_SETTINGS, ...s.data() } : DEFAULT_SETTINGS;
 }
-export async function createBill(user, form, computed, initialPayment) {
+export async function createBill(user, form, computed, initialPayment, { quiet = false } = {}) {
   const res = await createBillCore(user, form, computed, initialPayment);
+  if (quiet) return res; // demo data: no guest emails or WhatsApp
   try {
     const [bill, settings] = await Promise.all([getBill(res.id), hotelSettings()]);
     res.emailQueued = !!(await autoEmail(user, settings, bill, 'created'));
@@ -719,8 +720,9 @@ export async function createBill(user, form, computed, initialPayment) {
   } catch { /* the bill is saved; email is best-effort */ }
   return res;
 }
-export async function recordPayment(user, billId, p) {
+export async function recordPayment(user, billId, p, { quiet = false } = {}) {
   const id = await recordPaymentCore(user, billId, p);
+  if (quiet) return id;
   try {
     const bill = await getBill(billId);
     if (bill?.paymentStatus === PAYMENT_STATUS.PAID) {
