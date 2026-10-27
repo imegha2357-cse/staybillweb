@@ -178,7 +178,8 @@ export function Starfield({ className = '', density = 1, shooting }) {
       stars = Array.from({ length: n }, () => ({ x: Math.random() * w, y: Math.random() * h, r: Math.random() * 1.2 + 0.2, p: Math.random() * Math.PI * 2, s: 0.5 + Math.random() * 1.5 }));
     };
     resize();
-    const still = level === 'off';
+    // Twinkling redraws the whole canvas every frame; only the opt-in 'full' level pays for it.
+    const still = level !== 'full';
     const starC = cssTriplet('w-star', '230 220 255');
     const tailC = cssTriplet('w-glow', '177 151 252');
     const allowShoot = (shooting ?? level === 'full') && !still;
@@ -216,7 +217,7 @@ export function PauseMotionButton({ className = '', inline = false }) {
   if (motionSetting === 'off') return null;
   const pos = inline
     ? 'inline-flex px-2 py-0.5 text-label-sm hover:bg-surface-container-low'
-    : 'fixed bottom-12 left-4 z-[70] px-3 py-1.5 text-label-md bg-surface-container-lowest/90 shadow-md ring-1 ring-outline-variant/40 backdrop-blur';
+    : 'fixed bottom-12 left-4 z-[70] px-3 py-1.5 text-label-md bg-surface-container-lowest/90 shadow-md ring-1 ring-outline-variant/40';
   return (
     <button type="button" onClick={() => setPaused(!paused)}
       className={`no-print flex items-center gap-1.5 rounded-full text-on-surface-variant hover:text-on-surface ${pos} ${className}`}

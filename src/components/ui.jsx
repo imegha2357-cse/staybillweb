@@ -178,7 +178,7 @@ export function Modal({ open, onClose, title, icon, children, footer, wide }) {
   // otherwise trap a fixed overlay inside the page and cut the window off.
   return createPortal(
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18 }}
-      className="no-print fixed inset-0 z-[60] flex items-end justify-center bg-black/45 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
+      className="no-print fixed inset-0 z-[60] flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
       <motion.div initial={{ opacity: 0, y: 18, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
         role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}
         className={cx('max-h-[92vh] w-full overflow-y-auto rounded-t-xl bg-surface-container-lowest shadow-xl sm:rounded-xl', wide ? 'sm:max-w-2xl' : 'sm:max-w-lg')}>

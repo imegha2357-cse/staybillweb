@@ -50,7 +50,6 @@
 .wl-glass {
   background: linear-gradient(180deg, rgb(var(--c-w-deep) / 0.45), rgb(var(--c-w-bg2) / 0.55));
   border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .wl-btn {
@@ -80,3 +79,8 @@
 @media (prefers-reduced-motion: reduce) {
   .wl-window, .wl-streak, .wl-marquee-track { animation: none !important; }
 }
+
+/* Default "light" level: the window lights, streaks and marquee stay still (see hotel.css). */
+[data-motion='light'] .wl-window,
+[data-motion='light'] .wl-streak { animation: none !important; }
+[data-motion='light'] .wl-marquee-track { animation: none !important; }

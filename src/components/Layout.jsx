@@ -264,7 +264,7 @@ export default function Layout() {
       {theme === 'dark' && <Starfield className="no-print fixed inset-0 -z-10 h-full w-full opacity-70" density={0.6} />}
       <CursorGlow />
 
-      <header className="no-print fixed inset-x-0 top-0 z-40 bg-surface-container-lowest/85 shadow-[0_1px_8px_rgba(0,0,0,0.05)] backdrop-blur-xl">
+      <header className="no-print fixed inset-x-0 top-0 z-40 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.06)]">
         <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-space-sm px-gutter lg:px-gutter-desktop">
           <Link to="/" className="mr-1 shrink-0" aria-label="Home">
             <Logo name={adminConsole ? 'StayBill' : settings.hotelName} logo={adminConsole ? '' : settings.logo} subtitle={adminConsole ? 'Administrator' : ROLE_LABEL[user.role]} />

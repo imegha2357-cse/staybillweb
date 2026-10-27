@@ -166,19 +166,22 @@ export async function createAccount(by, { name, username, password, role, hotelI
       if (e?.code === 'auth/email-already-in-use') throw new Error(`The username "${uname}" is already taken. Choose another.`);
       throw e;
     }
-    await updateProfile(cred.user, { displayName: name });
+    // The profile must exist before anything else; the rest runs side by side
+    // (one round trip to Google instead of five).
     await setDoc(doc(db, 'users', cred.user.uid), {
       name: name.trim(), username: uname, role, hotelId: hotelId || null, phone, status: 'active',
       createdAt: serverTimestamp(), createdBy: actor(by),
     });
-    await signOut(sAuth);
-    if (role === 'owner' && hotelId) {
-      await updateDoc(doc(db, 'hotels', hotelId), { ownerUid: cred.user.uid, ownerName: name.trim(), ownerUsername: uname, updatedAt: serverTimestamp() });
-    }
-    if (hotelId) await addDoc(hcol('auditLogs', hotelId), auditPayload(by, 'USER_CREATED', 'user', cred.user.uid, { name, username: uname, role }));
+    await Promise.all([
+      signOut(sAuth).catch(() => {}),
+      role === 'owner' && hotelId
+        ? updateDoc(doc(db, 'hotels', hotelId), { ownerUid: cred.user.uid, ownerName: name.trim(), ownerUsername: uname, updatedAt: serverTimestamp() })
+        : null,
+      hotelId ? addDoc(hcol('auditLogs', hotelId), auditPayload(by, 'USER_CREATED', 'user', cred.user.uid, { name, username: uname, role })).catch(() => {}) : null,
+    ]);
     return cred.user.uid;
   } finally {
-    await deleteApp(secondary);
+    deleteApp(secondary).catch(() => {});
   }
 }
 export async function updateAccount(by, target, data) {

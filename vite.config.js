@@ -18,7 +18,6 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
-            pdf: ['jspdf', 'jspdf-autotable'],
           },
         },
       },
